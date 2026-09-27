@@ -1,4 +1,125 @@
-import { ExtractedCardData, SourceType } from "@/types/extractor";
+import { ExtractedCardData, FieldConfidence, SourceType } from "@/types/extractor";
+
+export const API_BASE_URL = (
+  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
+).replace(/\/+$/, "");
+
+/**
+ * Helper to rasterize an SVG data URL to a PNG File via HTML5 Canvas
+ * so that image decoders (OpenCV / backend) can process it reliably.
+ */
+function rasterizeSvgToPngFile(dataUrl: string, fileName: string): Promise<File> {
+  return new Promise((resolve, reject) => {
+    if (typeof window === "undefined") {
+      reject(new Error("Cannot rasterize image in SSR environment"));
+      return;
+    }
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = 800;
+        canvas.height = 480;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Unable to create canvas context"));
+          return;
+        }
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, 800, 480);
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            reject(new Error("Canvas toBlob export failed"));
+            return;
+          }
+          const cleanName = fileName.replace(/\.[^.]+$/, ".png");
+          resolve(new File([blob], cleanName, { type: "image/png" }));
+        }, "image/png");
+      } catch (err) {
+        reject(err);
+      }
+    };
+    img.onerror = () => {
+      reject(new Error("Failed to load SVG data URL for rasterization"));
+    };
+    img.src = dataUrl;
+  });
+}
+
+/**
+ * Helper to create a fallback PNG file when only a filename is available
+ */
+function createFallbackPngFile(fileName: string): Promise<File> {
+  return new Promise((resolve, reject) => {
+    if (typeof window === "undefined") {
+      reject(new Error("Cannot create canvas in SSR environment"));
+      return;
+    }
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = 800;
+      canvas.height = 480;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("Unable to create canvas context"));
+        return;
+      }
+      ctx.fillStyle = "#1e293b";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#f8fafc";
+      ctx.font = "bold 28px sans-serif";
+      ctx.fillText(fileName, 40, 100);
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error("Fallback canvas toBlob failed"));
+          return;
+        }
+        const safeName = fileName.replace(/\.[^.]+$/, ".png");
+        resolve(new File([blob], safeName, { type: "image/png" }));
+      }, "image/png");
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+/**
+ * Resolves various file input formats (File, Blob, { previewUrl }, or { name })
+ * to a genuine File instance with a backend-compatible extension (.jpg, .jpeg, .png).
+ */
+export async function resolveToFile(
+  input: File | Blob | { name: string; file?: File; previewUrl?: string }
+): Promise<File> {
+  if (typeof File !== "undefined" && input instanceof File) {
+    return input;
+  }
+  if (typeof Blob !== "undefined" && input instanceof Blob) {
+    return new File([input], "card.jpg", { type: input.type || "image/jpeg" });
+  }
+  if (typeof input === "object" && input !== null) {
+    if ("file" in input && input.file instanceof File) {
+      return input.file;
+    }
+    const inputName = "name" in input && typeof input.name === "string" ? input.name : "card.png";
+    if ("previewUrl" in input && typeof input.previewUrl === "string" && input.previewUrl) {
+      if (input.previewUrl.startsWith("data:image/svg+xml")) {
+        return await rasterizeSvgToPngFile(input.previewUrl, inputName);
+      }
+      try {
+        const res = await fetch(input.previewUrl);
+        const blob = await res.blob();
+        const safeName = /\.(jpe?g|png)$/i.test(inputName) ? inputName : `${inputName}.jpg`;
+        return new File([blob], safeName, { type: blob.type || "image/jpeg" });
+      } catch (e) {
+        console.warn("Could not convert previewUrl to Blob:", e);
+      }
+    }
+    return createFallbackPngFile(inputName);
+  }
+  return createFallbackPngFile("card.png");
+}
 
 // Helper to generate a random UUID-like string
 export function generateUUID(): string {
@@ -184,57 +305,133 @@ export const SAMPLE_PREVIEWS: { name: string; url: string; size: number }[] = [
 let mockIndex = 0;
 
 /**
- * Service function to extract card data from an image.
- * 
- * To switch to the real FastAPI backend later, simply update this function:
- * ```ts
- * const formData = new FormData();
- * formData.append('file', file);
- * const res = await fetch('http://localhost:8000/api/extract', { method: 'POST', body: formData });
- * return await res.json();
- * ```
+ * Service function to extract card data from an image by chaining
+ * POST /upload (multipart/form-data) -> POST /extract (application/json)
+ * using the real FastAPI backend.
  */
 export async function extractCardData(
-  _fileOrName: File | { name: string },
+  fileOrInput: File | Blob | { name: string; file?: File; previewUrl?: string },
   shouldSimulateFailure = false
 ): Promise<ExtractedCardData> {
-  // Simulate network latency (between 800ms and 1800ms)
-  const delay = 800 + Math.random() * 1000;
-  await new Promise((resolve) => setTimeout(resolve, delay));
-
   if (shouldSimulateFailure) {
-    throw new Error("FastAPI OCR Engine timeout: failed to process image stream. Please retry.");
+    throw new Error("FastAPI OCR Engine simulated timeout: failed to process image stream. Please retry.");
   }
 
-  // Determine mock item based on filename or cyclic index
-  const fileName = ("name" in _fileOrName ? _fileOrName.name : "").toLowerCase();
+  // Step 0: Ensure we have a valid File object for multipart upload
+  const file = await resolveToFile(fileOrInput);
 
-  let template: Omit<ExtractedCardData, "image_id">;
-  if (fileName.includes("unreadable") || fileName.includes("blur")) {
-    template = SAMPLE_EXTRACTED_RESULTS[4]; // all null
-  } else if (fileName.includes("apex")) {
-    template = SAMPLE_EXTRACTED_RESULTS[0];
-  } else if (fileName.includes("nova")) {
-    template = SAMPLE_EXTRACTED_RESULTS[1];
-  } else if (fileName.includes("zenith")) {
-    template = SAMPLE_EXTRACTED_RESULTS[2];
-  } else if (fileName.includes("quantum")) {
-    template = SAMPLE_EXTRACTED_RESULTS[3];
-  } else if (fileName.includes("vortex")) {
-    template = SAMPLE_EXTRACTED_RESULTS[6];
-  } else {
-    template = SAMPLE_EXTRACTED_RESULTS[mockIndex % SAMPLE_EXTRACTED_RESULTS.length];
-    mockIndex++;
+  // Step 1: Upload the file (POST {BASE_URL}/upload)
+  let uploadRes: Response;
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    uploadRes = await fetch(`${API_BASE_URL}/upload`, {
+      method: "POST",
+      body: formData,
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("Load failed")) {
+      throw new Error(
+        `Backend connection failed (${API_BASE_URL}). Please verify FastAPI is running and CORS allows origin.`
+      );
+    }
+    throw new Error(`Upload network error: ${msg}`);
   }
+
+  if (!uploadRes.ok) {
+    let errorDetail = `HTTP ${uploadRes.status} ${uploadRes.statusText}`;
+    try {
+      const errJson = await uploadRes.json();
+      if (errJson.detail) {
+        errorDetail = typeof errJson.detail === "string" ? errJson.detail : JSON.stringify(errJson.detail);
+      }
+    } catch {
+      // fallback to status text
+    }
+    throw new Error(`Upload failed (${uploadRes.status}): ${errorDetail}`);
+  }
+
+  const uploadData = await uploadRes.json();
+  const imageId = uploadData?.image_id;
+  if (!imageId) {
+    throw new Error("Backend upload response did not include 'image_id'");
+  }
+
+  // Step 2: Extract data using image_id (POST {BASE_URL}/extract)
+  // Note: source_type is omitted so backend defaults it as requested
+  let extractRes: Response;
+  try {
+    extractRes = await fetch(`${API_BASE_URL}/extract`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        image_id: imageId,
+      }),
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("Load failed")) {
+      throw new Error(
+        `Extraction request failed (${API_BASE_URL}/extract). Please check network and backend CORS.`
+      );
+    }
+    throw new Error(`Extraction network error: ${msg}`);
+  }
+
+  if (!extractRes.ok) {
+    let errorDetail = `HTTP ${extractRes.status} ${extractRes.statusText}`;
+    try {
+      const errJson = await extractRes.json();
+      if (errJson.detail) {
+        errorDetail = typeof errJson.detail === "string" ? errJson.detail : JSON.stringify(errJson.detail);
+      }
+    } catch {
+      // fallback to status text
+    }
+    throw new Error(`Extraction failed (${extractRes.status}): ${errorDetail}`);
+  }
+
+  const extractData = await extractRes.json();
+
+  // Step 3: Normalize and format to exact ExtractedCardData shape
+  const rawConfidence = extractData?.confidence || {};
+  const confidence: FieldConfidence = {
+    company_name:
+      typeof rawConfidence.company_name === "number"
+        ? rawConfidence.company_name
+        : 0.0,
+    email:
+      typeof rawConfidence.email === "number"
+        ? rawConfidence.email
+        : 0.0,
+    phone:
+      typeof rawConfidence.phone === "number"
+        ? rawConfidence.phone
+        : 0.0,
+    website:
+      typeof rawConfidence.website === "number"
+        ? rawConfidence.website
+        : 0.0,
+  };
+
+  const validSourceTypes: SourceType[] = ["card", "paper", "panaflex"];
+  const rawSourceType = String(extractData?.source_type || "card").toLowerCase();
+  const sourceType: SourceType = validSourceTypes.includes(rawSourceType as SourceType)
+    ? (rawSourceType as SourceType)
+    : "card";
 
   return {
-    image_id: generateUUID(),
-    company_name: template.company_name,
-    email: template.email,
-    phone: template.phone,
-    website: template.website,
-    confidence: { ...template.confidence },
-    source_type: template.source_type,
+    image_id: extractData.image_id || imageId,
+    company_name: extractData.company_name ?? null,
+    email: extractData.email ?? null,
+    phone: extractData.phone ?? null,
+    website: extractData.website ?? null,
+    confidence,
+    source_type: sourceType,
   };
 }
 

@@ -28,6 +28,7 @@ export interface CardItem {
   fileSize: number;
   fileType: string;
   previewUrl: string;
+  file?: File;
   status: ProcessingStatus;
   progress?: number; // 0-100%
   errorMessage?: string;

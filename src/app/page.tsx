@@ -18,6 +18,9 @@ import {
 
 function ExpoCardExtractorApp() {
   const [items, setItems] = useState<CardItem[]>([]);
+  const itemsRef = React.useRef<CardItem[]>(items);
+  itemsRef.current = items;
+
   const [isExtractingAll, setIsExtractingAll] = useState(false);
   const { showToast } = useToast();
 
@@ -29,6 +32,7 @@ function ExpoCardExtractorApp() {
       fileSize: file.size,
       fileType: file.type,
       previewUrl: URL.createObjectURL(file),
+      file: file,
       status: "queued",
       data: null,
       isReviewed: false,
@@ -92,12 +96,16 @@ function ExpoCardExtractorApp() {
     );
 
     try {
-      // Find item
-      const currentItem = items.find((i) => i.id === itemId);
-      const res = await extractCardData(
-        { name: currentItem ? currentItem.fileName : "card.jpg" },
-        shouldSimulateFail
-      );
+      // Find item from itemsRef to avoid stale closures
+      const currentItem = itemsRef.current.find((i) => i.id === itemId);
+      if (!currentItem) return;
+
+      const input = currentItem.file || {
+        name: currentItem.fileName,
+        previewUrl: currentItem.previewUrl,
+      };
+
+      const res = await extractCardData(input, shouldSimulateFail);
 
       // Set status to done with data
       setItems((prev) =>
@@ -126,26 +134,18 @@ function ExpoCardExtractorApp() {
         )
       );
     }
-  }, [items]);
+  }, []);
 
   // Extract All pending items (non-blocking)
   const handleExtractAll = useCallback(async () => {
-    const queuedItems = items.filter((i) => i.status === "queued");
+    const queuedItems = itemsRef.current.filter((i) => i.status === "queued");
     if (queuedItems.length === 0) return;
 
     setIsExtractingAll(true);
 
-    // Run parallel batches with concurrency of 2 to simulate real OCR throughput
-    const batchSize = 2;
-    for (let i = 0; i < queuedItems.length; i += batchSize) {
-      const chunk = queuedItems.slice(i, i + batchSize);
-      await Promise.all(
-        chunk.map((item, idx) => {
-          // Simulate 1 intermittent failure for testing retry flow if filename has 'zenith'
-          const shouldFail = item.fileName.toLowerCase().includes("zenith") && !item.errorMessage;
-          return processCard(item.id, shouldFail);
-        })
-      );
+    // Process queued cards sequentially so local OCR CPU load remains smooth
+    for (const item of queuedItems) {
+      await processCard(item.id, false);
     }
 
     setIsExtractingAll(false);
@@ -154,7 +154,7 @@ function ExpoCardExtractorApp() {
       title: "Batch Extraction Complete",
       description: "Finished processing card queue. Review any flagged rows below.",
     });
-  }, [items, processCard, showToast]);
+  }, [processCard, showToast]);
 
   // Retry a single card
   const handleRetryRow = useCallback(
