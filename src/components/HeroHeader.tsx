@@ -6,11 +6,10 @@ import { CardItem } from "@/types/extractor";
 
 interface HeroHeaderProps {
   items: CardItem[];
-  onLoadSamples: () => void;
   onClearAll: () => void;
 }
 
-export default function HeroHeader({ items, onLoadSamples, onClearAll }: HeroHeaderProps) {
+export default function HeroHeader({ items, onClearAll }: HeroHeaderProps) {
   const total = items.length;
   const processing = items.filter((i) => i.status === "processing" || i.status === "queued").length;
   const completed = items.filter((i) => i.status === "done").length;
@@ -31,7 +30,7 @@ export default function HeroHeader({ items, onLoadSamples, onClearAll }: HeroHea
           <div className="space-y-1.5">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium bg-brass/10 border border-brass/30 text-champagne">
               <Sparkles className="w-3.5 h-3.5 text-brass animate-pulse" />
-              <span>FastAPI OCR Ready • Frontend Demo</span>
+              <span>Connected to FastAPI OCR • Live Backend</span>
             </div>
             <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-champagne flex items-center gap-3">
               <span className="p-2 rounded-xl bg-gradient-to-tr from-brass via-brass-hover to-champagne text-app shadow-lg shadow-brass/25">
@@ -46,14 +45,6 @@ export default function HeroHeader({ items, onLoadSamples, onClearAll }: HeroHea
 
           {/* Action buttons */}
           <div className="flex items-center gap-3 flex-wrap">
-            <button
-              onClick={onLoadSamples}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-champagne bg-elevated hover:bg-surface border border-border-warm shadow-sm transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] cursor-pointer hover:border-brass/50"
-              title="Instantly load sample expo cards with high confidence, low confidence, and unreadable scans"
-            >
-              <Sparkles className="w-4 h-4 text-brass" />
-              <span>Load Sample Cards</span>
-            </button>
             {total > 0 && (
               <button
                 onClick={onClearAll}

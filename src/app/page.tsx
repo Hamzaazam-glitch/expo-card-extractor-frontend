@@ -13,7 +13,6 @@ import { CardItem, ExtractedCardData, SourceType } from "@/types/extractor";
 import {
   extractCardData,
   generateUUID,
-  SAMPLE_PREVIEWS,
 } from "@/services/extractorService";
 
 function ExpoCardExtractorApp() {
@@ -44,28 +43,6 @@ function ExpoCardExtractorApp() {
       type: "info",
       title: "Images Added to Queue",
       description: `Added ${newItems.length} image${newItems.length > 1 ? "s" : ""} ready for extraction.`,
-    });
-  }, [showToast]);
-
-  // Load sample exhibition cards
-  const handleLoadSamples = useCallback(() => {
-    const sampleItems: CardItem[] = SAMPLE_PREVIEWS.map((sample, idx) => ({
-      id: generateUUID(),
-      fileName: sample.name,
-      fileSize: sample.size,
-      fileType: "image/jpeg",
-      previewUrl: sample.url,
-      status: "queued",
-      data: null,
-      isReviewed: false,
-      createdAt: Date.now() + idx,
-    }));
-
-    setItems((prev) => [...prev, ...sampleItems]);
-    showToast({
-      type: "success",
-      title: "Sample Expo Cards Loaded",
-      description: "Loaded 6 demonstration cards including clear, low-confidence, and unreadable scans.",
     });
   }, [showToast]);
 
@@ -271,7 +248,6 @@ function ExpoCardExtractorApp() {
       {/* Top Header */}
       <HeroHeader
         items={items}
-        onLoadSamples={handleLoadSamples}
         onClearAll={handleClearAll}
       />
 
@@ -289,7 +265,6 @@ function ExpoCardExtractorApp() {
             onAddFiles={handleAddFiles}
             onRemoveItem={handleRemoveItem}
             onExtractAll={handleExtractAll}
-            onLoadSamples={handleLoadSamples}
             isExtracting={isExtractingAll}
           />
         </motion.section>

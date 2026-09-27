@@ -9,7 +9,6 @@ interface UploadZoneProps {
   onAddFiles: (files: File[]) => void;
   onRemoveItem: (id: string) => void;
   onExtractAll: () => void;
-  onLoadSamples: () => void;
   isExtracting: boolean;
 }
 
@@ -22,7 +21,6 @@ export default function UploadZone({
   onAddFiles,
   onRemoveItem,
   onExtractAll,
-  onLoadSamples,
   isExtracting,
 }: UploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
@@ -280,15 +278,8 @@ export default function UploadZone({
           </div>
           <p className="text-sm font-medium text-champagne">No cards uploaded yet</p>
           <p className="text-xs text-champagne-muted mt-1 max-w-sm">
-            Drag and drop card photos above or load our pre-configured test cards to explore the OCR pipeline immediately.
+            Drag and drop business card photos, expo flyer scans, or booth banners above to begin extraction with the live backend.
           </p>
-          <button
-            onClick={onLoadSamples}
-            className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold text-champagne bg-brass/10 hover:bg-brass/20 border border-brass/30 transition-colors cursor-pointer"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-brass" />
-            <span>Load 6 Demo Exhibition Cards</span>
-          </button>
         </div>
       )}
     </div>
