@@ -32,7 +32,7 @@ export const SAMPLE_EXTRACTED_RESULTS: Omit<ExtractedCardData, "image_id">[] = [
   {
     company_name: "Nova Green Energy",
     // Low confidence email to trigger the functional yellow-border flag (< 0.6)
-    email: "info?nova-grn.com",
+    email: "info@novagreen.energy",
     phone: "+44 20 7946 0912",
     website: "https://novagreen.energy",
     confidence: {
@@ -47,7 +47,7 @@ export const SAMPLE_EXTRACTED_RESULTS: Omit<ExtractedCardData, "image_id">[] = [
     company_name: "Zenith Global Logistics",
     email: "ops@zenithgl.com",
     // Low confidence phone to trigger the yellow-border flag (< 0.6)
-    phone: "+81 3-555-01??",
+    phone: "+81 3-555-0199",
     website: "https://zenithlogistics.jp",
     confidence: {
       company_name: 0.92,
