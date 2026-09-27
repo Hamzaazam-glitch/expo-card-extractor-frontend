@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Download, FileSpreadsheet, FileText, Check, Filter } from "lucide-react";
+import { FileSpreadsheet, FileText, Filter } from "lucide-react";
 import { CardItem } from "@/types/extractor";
 import { exportToCSV, exportToExcel } from "@/utils/exportUtils";
 import { useToast } from "@/components/Toast";
@@ -63,12 +63,12 @@ export default function ExportBar({ items }: ExportBarProps) {
   };
 
   return (
-    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 p-4 rounded-xl bg-slate-900/90 border border-slate-800 shadow-xl backdrop-blur-md">
+    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 p-4 rounded-xl bg-surface/90 border border-border-warm shadow-xl backdrop-blur-md">
       {/* Left: Filter Toggle */}
       <div className="flex items-center gap-3">
         <label
           htmlFor="reviewed-toggle"
-          className="flex items-center gap-2.5 cursor-pointer text-sm font-medium text-slate-300 select-none group"
+          className="flex items-center gap-2.5 cursor-pointer text-sm font-medium text-champagne select-none group"
         >
           <div className="relative">
             <input
@@ -78,15 +78,15 @@ export default function ExportBar({ items }: ExportBarProps) {
               onChange={(e) => setOnlyReviewed(e.target.checked)}
               className="sr-only peer"
             />
-            <div className="w-10 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600 border border-slate-700" />
+            <div className="w-10 h-6 bg-elevated peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border-warm after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brass border border-border-warm" />
           </div>
           <span className="flex items-center gap-1.5 text-xs sm:text-sm">
-            <Filter className="w-3.5 h-3.5 text-indigo-400" />
-            <span>Export only marked <strong className="text-white">&quot;Reviewed&quot;</strong></span>
+            <Filter className="w-3.5 h-3.5 text-brass" />
+            <span>Export only marked <strong className="text-champagne font-bold">&quot;Reviewed&quot;</strong></span>
           </span>
         </label>
 
-        <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
+        <span className="text-xs px-2.5 py-0.5 rounded-full bg-elevated text-champagne-muted border border-border-warm">
           {eligibleCount} {eligibleCount === 1 ? "record" : "records"} ready
         </span>
       </div>
@@ -98,12 +98,12 @@ export default function ExportBar({ items }: ExportBarProps) {
           disabled={eligibleCount === 0 || isExporting}
           className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
             eligibleCount === 0
-              ? "bg-slate-800/60 text-slate-600 border border-slate-800 cursor-not-allowed"
-              : "bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 shadow-sm hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+              ? "bg-elevated text-champagne-muted/40 border border-border-warm cursor-not-allowed"
+              : "bg-elevated hover:bg-surface text-champagne hover:text-white border border-border-warm shadow-sm hover:scale-[1.02] active:scale-[0.98] cursor-pointer hover:border-brass/40"
           }`}
           title="Download RFC-4180 compliant CSV format"
         >
-          <FileText className="w-4 h-4 text-emerald-400" />
+          <FileText className="w-4 h-4 text-brass" />
           <span>Export CSV</span>
         </button>
 
@@ -112,8 +112,8 @@ export default function ExportBar({ items }: ExportBarProps) {
           disabled={eligibleCount === 0 || isExporting}
           className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg transition-all duration-200 ${
             eligibleCount === 0
-              ? "bg-slate-800 text-slate-600 border border-slate-800 cursor-not-allowed"
-              : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+              ? "bg-elevated text-champagne-muted/40 border border-border-warm cursor-not-allowed"
+              : "bg-emerald-700 hover:bg-emerald-600 text-white shadow-emerald-700/20 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
           }`}
           title="Download formatted Microsoft Excel (.xlsx) workbook"
         >

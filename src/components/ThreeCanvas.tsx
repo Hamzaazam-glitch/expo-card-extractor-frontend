@@ -45,10 +45,10 @@ export default function ThreeCanvas() {
     const positions = new Float32Array(particleCount * 3);
     const colors = new Float32Array(particleCount * 3);
 
-    // Color palette: deep indigo, muted violet, cyber cyan
-    const color1 = new THREE.Color(0x6366f1); // Indigo
-    const color2 = new THREE.Color(0xa855f7); // Purple
-    const color3 = new THREE.Color(0x06b6d4); // Cyan
+    // Obsidian & Brass Palette: #b8823d (Brass), #e4caa8 (Champagne Quartz), #7a592c (Smoked Bronze)
+    const color1 = new THREE.Color(0xb8823d); // Brushed Brass
+    const color2 = new THREE.Color(0xe4caa8); // Champagne Quartz
+    const color3 = new THREE.Color(0x7a592c); // Smoked Bronze
 
     for (let i = 0; i < particleCount; i++) {
       positions[i * 3] = (Math.random() - 0.5) * 160;
@@ -72,7 +72,7 @@ export default function ThreeCanvas() {
     if (ctx) {
       const gradient = ctx.createRadialGradient(8, 8, 0, 8, 8, 8);
       gradient.addColorStop(0, "rgba(255,255,255,0.9)");
-      gradient.addColorStop(0.5, "rgba(255,255,255,0.4)");
+      gradient.addColorStop(0.5, "rgba(236,220,199,0.5)"); // Soft champagne glow
       gradient.addColorStop(1, "rgba(255,255,255,0)");
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, 16, 16);
@@ -83,7 +83,7 @@ export default function ThreeCanvas() {
       size: 3.2,
       map: texture,
       transparent: true,
-      opacity: 0.55,
+      opacity: 0.6,
       vertexColors: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
@@ -92,11 +92,11 @@ export default function ThreeCanvas() {
     const points = new THREE.Points(geometry, material);
     scene.add(points);
 
-    // Subtle line connections between nearby points
+    // Subtle line connections between nearby points in warm brass
     const linesMaterial = new THREE.LineBasicMaterial({
-      color: 0x6366f1,
+      color: 0xb8823d,
       transparent: true,
-      opacity: 0.12,
+      opacity: 0.1,
       blending: THREE.AdditiveBlending,
     });
 
@@ -183,7 +183,7 @@ export default function ThreeCanvas() {
     <div
       ref={containerRef}
       aria-hidden="true"
-      className="absolute inset-0 pointer-events-none overflow-hidden z-0 opacity-70"
+      className="absolute inset-0 pointer-events-none overflow-hidden z-0 opacity-75"
     />
   );
 }

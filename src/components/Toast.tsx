@@ -45,17 +45,17 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         aria-live="polite"
       >
         {toasts.map((toast) => {
-          let icon = <Info className="w-5 h-5 text-sky-400 shrink-0" />;
-          let border = "border-sky-500/30 bg-sky-950/80";
+          let icon = <Info className="w-5 h-5 text-brass shrink-0" />;
+          let border = "border-brass/40 bg-surface/95";
           if (toast.type === "success") {
             icon = <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />;
-            border = "border-emerald-500/30 bg-emerald-950/80";
+            border = "border-emerald-500/30 bg-surface/95";
           } else if (toast.type === "warning") {
             icon = <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />;
-            border = "border-amber-500/30 bg-amber-950/80";
+            border = "border-amber-500/30 bg-surface/95";
           } else if (toast.type === "error") {
             icon = <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />;
-            border = "border-rose-500/30 bg-rose-950/80";
+            border = "border-rose-500/30 bg-surface/95";
           }
 
           return (

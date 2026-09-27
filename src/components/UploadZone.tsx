@@ -99,8 +99,8 @@ export default function UploadZone({
         onClick={() => fileInputRef.current?.click()}
         className={`group relative rounded-2xl border-2 border-dashed p-8 sm:p-10 transition-all duration-300 cursor-pointer flex flex-col items-center justify-center text-center overflow-hidden ${
           isDragging
-            ? "border-indigo-400 bg-indigo-500/10 shadow-2xl shadow-indigo-500/20 scale-[1.01]"
-            : "border-slate-800 hover:border-indigo-500/60 bg-slate-900/40 hover:bg-slate-900/70"
+            ? "border-brass bg-brass/10 shadow-2xl shadow-brass/20 scale-[1.01]"
+            : "border-border-warm hover:border-brass/70 bg-surface/50 hover:bg-surface/80"
         }`}
       >
         <input
@@ -113,35 +113,35 @@ export default function UploadZone({
           id="card-file-input"
         />
 
-        {/* Ambient glow accent inside dropzone */}
-        <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-80 h-32 bg-indigo-500/10 blur-3xl pointer-events-none rounded-full" />
+        {/* Ambient glow accent inside dropzone in warm brass */}
+        <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-80 h-32 bg-brass/10 blur-3xl pointer-events-none rounded-full" />
 
         <div className="relative z-10 flex flex-col items-center">
           <div
             className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-110 shadow-lg ${
               isDragging
-                ? "bg-indigo-600 text-white shadow-indigo-500/50"
-                : "bg-slate-800 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white"
+                ? "bg-brass text-app shadow-brass/40"
+                : "bg-elevated text-brass group-hover:bg-brass group-hover:text-app border border-border-warm"
             }`}
           >
             <UploadCloud className="w-8 h-8" />
           </div>
 
-          <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight">
+          <h3 className="text-lg sm:text-xl font-bold text-champagne tracking-tight">
             {isDragging ? "Drop your images right here!" : "Drag & drop card images here, or browse"}
           </h3>
-          <p className="text-sm text-slate-400 mt-1.5 max-w-md">
+          <p className="text-sm text-champagne-muted mt-1.5 max-w-md">
             Supports multiple batch uploads • Accepts JPG, PNG, and WebP up to 10MB each
           </p>
 
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-            <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md bg-slate-800/80 text-slate-300 border border-slate-700/60">
-              <ImageIcon className="w-3.5 h-3.5 text-indigo-400" /> Business Cards
+            <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md bg-elevated text-champagne border border-border-warm">
+              <ImageIcon className="w-3.5 h-3.5 text-brass" /> Business Cards
             </span>
-            <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md bg-slate-800/80 text-slate-300 border border-slate-700/60">
+            <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md bg-elevated text-champagne border border-border-warm">
               Paper Flyers
             </span>
-            <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md bg-slate-800/80 text-slate-300 border border-slate-700/60">
+            <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md bg-elevated text-champagne border border-border-warm">
               Panaflex Banners
             </span>
           </div>
@@ -150,9 +150,9 @@ export default function UploadZone({
 
       {/* Upload Error Banner */}
       {uploadError && (
-        <div className="flex items-center justify-between p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm animate-in fade-in">
+        <div className="flex items-center justify-between p-4 rounded-xl bg-error/10 border border-error/30 text-rose-300 text-sm animate-in fade-in">
           <div className="flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+            <AlertCircle className="w-5 h-5 text-error shrink-0" />
             <span>{uploadError}</span>
           </div>
           <button
@@ -160,7 +160,7 @@ export default function UploadZone({
               e.stopPropagation();
               setUploadError(null);
             }}
-            className="text-rose-400 hover:text-rose-200 p-1"
+            className="text-rose-400 hover:text-rose-200 p-1 cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -172,25 +172,25 @@ export default function UploadZone({
         <div className="space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-2">
-              <h4 className="text-base font-semibold text-white">
+              <h4 className="text-base font-semibold text-champagne">
                 Queue &amp; Previews
               </h4>
-              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">
+              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-elevated text-champagne border border-border-warm">
                 {items.length} {items.length === 1 ? "card" : "cards"}
               </span>
             </div>
 
-            {/* "Extract All" CTA Button */}
+            {/* "Extract All" CTA Button in Brushed Brass */}
             <div className="flex items-center gap-3">
               <button
                 onClick={onExtractAll}
                 disabled={isExtracting || pendingCount === 0}
                 className={`inline-flex items-center gap-2.5 px-6 py-2.5 rounded-xl text-sm font-bold shadow-lg transition-all duration-200 ${
                   pendingCount === 0
-                    ? "bg-slate-800 text-slate-500 border border-slate-700/60 cursor-not-allowed"
+                    ? "bg-elevated text-champagne-muted/50 border border-border-warm cursor-not-allowed"
                     : isExtracting
-                    ? "bg-indigo-600/70 text-indigo-200 cursor-wait animate-pulse"
-                    : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                    ? "bg-brass/70 text-app cursor-wait animate-pulse"
+                    : "bg-brass hover:bg-brass-hover text-app shadow-brass/25 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
                 }`}
               >
                 <Play className="w-4 h-4 fill-current" />
@@ -210,10 +210,10 @@ export default function UploadZone({
             {items.map((item) => (
               <div
                 key={item.id}
-                className="group relative rounded-xl bg-slate-900/80 border border-slate-800 overflow-hidden hover:border-slate-700 transition-all duration-200 flex flex-col"
+                className="group relative rounded-xl bg-surface/90 border border-border-warm overflow-hidden hover:border-brass/40 transition-all duration-200 flex flex-col"
               >
                 {/* Image Aspect ratio container */}
-                <div className="relative aspect-[16/10] bg-slate-950 overflow-hidden flex items-center justify-center">
+                <div className="relative aspect-[16/10] bg-app overflow-hidden flex items-center justify-center">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={item.previewUrl}
@@ -224,23 +224,23 @@ export default function UploadZone({
                   {/* Status Overlay Badge */}
                   <div className="absolute top-1.5 left-1.5">
                     {item.status === "queued" && (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-800/90 text-slate-300 border border-slate-700 backdrop-blur-xs">
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-elevated/95 text-champagne border border-border-warm backdrop-blur-xs">
                         Queued
                       </span>
                     )}
                     {item.status === "processing" && (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/90 text-slate-950 border border-amber-400 backdrop-blur-xs flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-slate-950 animate-ping" />
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-warning text-app border border-amber-300 backdrop-blur-xs flex items-center gap-1 font-bold">
+                        <span className="w-1.5 h-1.5 rounded-full bg-app animate-ping" />
                         Processing
                       </span>
                     )}
                     {item.status === "done" && (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/90 text-slate-950 border border-emerald-400 backdrop-blur-xs">
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-success text-app border border-emerald-300 backdrop-blur-xs font-bold">
                         Done
                       </span>
                     )}
                     {item.status === "failed" && (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-500/90 text-white border border-rose-400 backdrop-blur-xs">
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-error text-white border border-rose-400 backdrop-blur-xs font-bold">
                         Failed
                       </span>
                     )}
@@ -252,7 +252,7 @@ export default function UploadZone({
                       e.stopPropagation();
                       onRemoveItem(item.id);
                     }}
-                    className="absolute top-1.5 right-1.5 p-1 rounded-full bg-slate-900/80 hover:bg-rose-600 text-slate-300 hover:text-white transition-colors opacity-80 group-hover:opacity-100"
+                    className="absolute top-1.5 right-1.5 p-1 rounded-full bg-surface/80 hover:bg-error text-champagne hover:text-white transition-colors opacity-80 group-hover:opacity-100 cursor-pointer"
                     title="Remove image"
                   >
                     <X className="w-3.5 h-3.5" />
@@ -261,10 +261,10 @@ export default function UploadZone({
 
                 {/* Details Footer */}
                 <div className="p-2 text-xs">
-                  <p className="font-medium text-slate-200 truncate" title={item.fileName}>
+                  <p className="font-medium text-champagne truncate" title={item.fileName}>
                     {item.fileName}
                   </p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">
+                  <p className="text-[10px] text-champagne-muted mt-0.5">
                     {(item.fileSize / 1024).toFixed(0)} KB
                   </p>
                 </div>
@@ -274,19 +274,19 @@ export default function UploadZone({
         </div>
       ) : (
         /* Empty State */
-        <div className="p-8 rounded-2xl bg-slate-900/20 border border-slate-800/60 text-center flex flex-col items-center justify-center">
-          <div className="w-12 h-12 rounded-xl bg-slate-800/60 text-slate-500 flex items-center justify-center mb-3">
+        <div className="p-8 rounded-2xl bg-surface/40 border border-border-warm text-center flex flex-col items-center justify-center">
+          <div className="w-12 h-12 rounded-xl bg-elevated text-champagne-muted flex items-center justify-center mb-3 border border-border-warm">
             <ImageIcon className="w-6 h-6" />
           </div>
-          <p className="text-sm font-medium text-slate-300">No cards uploaded yet</p>
-          <p className="text-xs text-slate-500 mt-1 max-w-sm">
+          <p className="text-sm font-medium text-champagne">No cards uploaded yet</p>
+          <p className="text-xs text-champagne-muted mt-1 max-w-sm">
             Drag and drop card photos above or load our pre-configured test cards to explore the OCR pipeline immediately.
           </p>
           <button
             onClick={onLoadSamples}
-            className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 transition-colors cursor-pointer"
+            className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold text-champagne bg-brass/10 hover:bg-brass/20 border border-brass/30 transition-colors cursor-pointer"
           >
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <Sparkles className="w-3.5 h-3.5 text-brass" />
             <span>Load 6 Demo Exhibition Cards</span>
           </button>
         </div>

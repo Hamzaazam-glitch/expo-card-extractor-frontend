@@ -6,10 +6,7 @@ import {
   AlertTriangle,
   RotateCw,
   Search,
-  Eye,
-  SlidersHorizontal,
   FileQuestion,
-  ExternalLink,
   Trash2,
   X,
   Maximize2
@@ -120,8 +117,8 @@ export default function ReviewTable({
             onClick={() => setActiveFilter("all")}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
               activeFilter === "all"
-                ? "bg-indigo-600 text-white shadow-sm"
-                : "bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800"
+                ? "bg-brass text-app font-bold shadow-sm"
+                : "bg-surface text-champagne-muted hover:text-champagne border border-border-warm"
             }`}
           >
             All Results ({doneOrFailedItems.length})
@@ -130,8 +127,8 @@ export default function ReviewTable({
             onClick={() => setActiveFilter("needs_review")}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
               activeFilter === "needs_review"
-                ? "bg-indigo-600 text-white shadow-sm"
-                : "bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800"
+                ? "bg-brass text-app font-bold shadow-sm"
+                : "bg-surface text-champagne-muted hover:text-champagne border border-border-warm"
             }`}
           >
             Needs Review ({doneOrFailedItems.filter((i) => !i.isReviewed).length})
@@ -140,19 +137,19 @@ export default function ReviewTable({
             onClick={() => setActiveFilter("low_confidence")}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
               activeFilter === "low_confidence"
-                ? "bg-amber-600 text-white shadow-sm"
-                : "bg-slate-900/80 text-amber-400/90 hover:text-amber-300 border border-slate-800"
+                ? "bg-amber-600 text-slate-950 font-bold shadow-sm"
+                : "bg-surface text-warning hover:text-amber-300 border border-border-warm"
             }`}
           >
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+            <AlertTriangle className="w-3.5 h-3.5 text-warning" />
             <span>Low Confidence (&lt;60%)</span>
           </button>
           <button
             onClick={() => setActiveFilter("unreadable")}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
               activeFilter === "unreadable"
-                ? "bg-rose-600 text-white shadow-sm"
-                : "bg-slate-900/80 text-rose-400/90 hover:text-rose-300 border border-slate-800"
+                ? "bg-error text-white font-bold shadow-sm"
+                : "bg-surface text-error hover:text-rose-300 border border-border-warm"
             }`}
           >
             <FileQuestion className="w-3.5 h-3.5" />
@@ -162,29 +159,29 @@ export default function ReviewTable({
             onClick={() => setActiveFilter("reviewed")}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1 cursor-pointer ${
               activeFilter === "reviewed"
-                ? "bg-indigo-600 text-white shadow-sm"
-                : "bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800"
+                ? "bg-brass text-app font-bold shadow-sm"
+                : "bg-surface text-champagne-muted hover:text-champagne border border-border-warm"
             }`}
           >
-            <Check className="w-3.5 h-3.5 text-emerald-400" />
+            <Check className="w-3.5 h-3.5 text-success" />
             <span>Reviewed ({doneOrFailedItems.filter((i) => i.isReviewed).length})</span>
           </button>
         </div>
 
         {/* Search input */}
         <div className="relative min-w-[240px]">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <Search className="w-4 h-4 text-brass absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search company, email, phone..."
-            className="w-full pl-9 pr-4 py-1.5 text-xs rounded-lg bg-slate-900/80 border border-slate-800 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
+            className="w-full pl-9 pr-4 py-1.5 text-xs rounded-lg bg-surface border border-border-warm text-champagne placeholder-champagne-muted/50 focus:outline-none focus:border-brass transition-colors"
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-champagne-muted hover:text-champagne cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -193,12 +190,12 @@ export default function ReviewTable({
       </div>
 
       {/* Main Review Table Container */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-950/60 shadow-xl overflow-hidden backdrop-blur-md">
+      <div className="rounded-2xl border border-border-warm bg-surface/75 shadow-xl overflow-hidden backdrop-blur-md">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs sm:text-sm">
             {/* Table Header */}
             <thead>
-              <tr className="border-b border-slate-800 bg-slate-900/80 text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
+              <tr className="border-b border-border-warm bg-elevated/90 text-champagne-muted font-semibold uppercase tracking-wider text-[11px]">
                 <th scope="col" className="py-3.5 px-3 w-12 text-center">
                   Reviewed ✓
                 </th>
@@ -227,10 +224,10 @@ export default function ReviewTable({
             </thead>
 
             {/* Table Body */}
-            <tbody className="divide-y divide-slate-800/80">
+            <tbody className="divide-y divide-border-warm/80">
               {filteredItems.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400">
+                  <td colSpan={8} className="py-12 text-center text-champagne-muted">
                     <p className="text-sm">No cards match the selected filter or search criteria.</p>
                   </td>
                 </tr>
@@ -246,10 +243,10 @@ export default function ReviewTable({
                       key={item.id}
                       className={`group transition-colors duration-150 ${
                         item.isReviewed
-                          ? "bg-slate-900/20 hover:bg-slate-900/40"
+                          ? "bg-surface/30 hover:bg-elevated/40"
                           : isUnreadable
-                          ? "bg-rose-950/20 hover:bg-rose-950/30 border-l-4 border-l-rose-500"
-                          : "hover:bg-slate-900/50"
+                          ? "bg-error/10 hover:bg-error/15 border-l-4 border-l-error"
+                          : "hover:bg-elevated/40"
                       }`}
                     >
                       {/* Column 1: Reviewed Checkbox */}
@@ -264,7 +261,7 @@ export default function ReviewTable({
                             checked={item.isReviewed}
                             onChange={() => onToggleReviewed(item.id)}
                             disabled={!isDone}
-                            className="w-4 h-4 rounded border-slate-700 text-indigo-600 bg-slate-900 focus:ring-indigo-500 focus:ring-offset-slate-900 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                            className="w-4 h-4 rounded border-border-warm text-brass bg-elevated focus:ring-brass cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
                           />
                         </label>
                       </td>
@@ -273,7 +270,7 @@ export default function ReviewTable({
                       <td className="py-3.5 px-4 align-middle">
                         <div
                           onClick={() => setZoomedImage({ url: item.previewUrl, title: item.fileName })}
-                          className="relative w-16 h-11 rounded-lg overflow-hidden border border-slate-700/80 bg-slate-900 cursor-pointer group/thumb shadow-sm hover:border-indigo-400 transition-colors"
+                          className="relative w-16 h-11 rounded-lg overflow-hidden border border-border-warm bg-app cursor-pointer group/thumb shadow-sm hover:border-brass transition-colors"
                           title="Click to view full size"
                         >
                           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -282,8 +279,8 @@ export default function ReviewTable({
                             alt={item.fileName}
                             className="w-full h-full object-cover group-hover/thumb:scale-110 transition-transform duration-200"
                           />
-                          <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover/thumb:opacity-100 flex items-center justify-center transition-opacity">
-                            <Maximize2 className="w-3.5 h-3.5 text-white" />
+                          <div className="absolute inset-0 bg-app/50 opacity-0 group-hover/thumb:opacity-100 flex items-center justify-center transition-opacity">
+                            <Maximize2 className="w-3.5 h-3.5 text-champagne" />
                           </div>
                         </div>
                       </td>
@@ -291,13 +288,13 @@ export default function ReviewTable({
                       {/* If the item failed extraction entirely */}
                       {isFailed ? (
                         <td colSpan={5} className="py-3.5 px-4 align-middle">
-                          <div className="flex items-center justify-between p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300">
+                          <div className="flex items-center justify-between p-2.5 rounded-lg bg-error/10 border border-error/30 text-rose-300">
                             <span className="text-xs">
                               {item.errorMessage || "Extraction failed. Click retry to run OCR again."}
                             </span>
                             <button
                               onClick={() => onRetryRow(item.id)}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold cursor-pointer"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-error hover:bg-rose-500 text-white text-xs font-semibold cursor-pointer"
                             >
                               <RotateCw className="w-3 h-3" />
                               <span>Retry</span>
@@ -307,11 +304,11 @@ export default function ReviewTable({
                       ) : isUnreadable ? (
                         /* If ALL fields are null (unreadable image): FLAG WHOLE ROW CLEARLY */
                         <td colSpan={4} className="py-3.5 px-4 align-middle">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/40 text-amber-300">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-warning/10 border border-warning/40 text-amber-200">
                             <div className="flex items-center gap-2">
-                              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 animate-bounce" />
+                              <AlertTriangle className="w-4 h-4 text-warning shrink-0 animate-bounce" />
                               <div>
-                                <span className="font-semibold text-xs sm:text-sm text-white">
+                                <span className="font-semibold text-xs sm:text-sm text-champagne">
                                   ⚠️ Unreadable Image — All extracted fields are null.
                                 </span>
                                 <span className="text-xs text-amber-200/90 ml-1.5">
@@ -321,7 +318,7 @@ export default function ReviewTable({
                             </div>
                             <button
                               onClick={() => onRetryRow(item.id)}
-                              className="self-start sm:self-auto inline-flex items-center gap-1 px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold text-xs transition-colors cursor-pointer"
+                              className="self-start sm:self-auto inline-flex items-center gap-1 px-2.5 py-1 rounded bg-warning hover:bg-amber-400 text-slate-950 font-bold text-xs transition-colors cursor-pointer"
                             >
                               <RotateCw className="w-3 h-3" />
                               <span>Retry OCR</span>
@@ -406,14 +403,14 @@ export default function ReviewTable({
                           <select
                             value={data.source_type}
                             onChange={(e) => onUpdateSourceType(item.id, e.target.value as SourceType)}
-                            className="bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer"
+                            className="bg-elevated border border-border-warm rounded-lg px-2.5 py-1 text-xs text-champagne focus:outline-none focus:border-brass cursor-pointer"
                           >
                             <option value="card">Card</option>
                             <option value="paper">Paper Flyer</option>
                             <option value="panaflex">Panaflex</option>
                           </select>
                         ) : (
-                          <span className="text-slate-600">—</span>
+                          <span className="text-champagne-muted/50">—</span>
                         )}
                       </td>
 
@@ -423,7 +420,7 @@ export default function ReviewTable({
                           {isDone && (
                             <button
                               onClick={() => onRetryRow(item.id)}
-                              className="p-1 rounded text-slate-400 hover:text-indigo-400 hover:bg-slate-800 transition-colors"
+                              className="p-1 rounded text-champagne-muted hover:text-brass hover:bg-elevated transition-colors cursor-pointer"
                               title="Re-run extraction on this card"
                             >
                               <RotateCw className="w-3.5 h-3.5" />
@@ -431,7 +428,7 @@ export default function ReviewTable({
                           )}
                           <button
                             onClick={() => onDeleteRow(item.id)}
-                            className="p-1 rounded text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors"
+                            className="p-1 rounded text-champagne-muted hover:text-error hover:bg-elevated transition-colors cursor-pointer"
                             title="Delete this row"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -451,22 +448,22 @@ export default function ReviewTable({
       {zoomedImage && (
         <div
           onClick={() => setZoomedImage(null)}
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="relative max-w-3xl w-full bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl p-4 space-y-3"
+            className="relative max-w-3xl w-full bg-surface border border-border-warm rounded-2xl overflow-hidden shadow-2xl p-4 space-y-3"
           >
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-              <h4 className="font-semibold text-white text-sm">{zoomedImage.title}</h4>
+            <div className="flex items-center justify-between pb-2 border-b border-border-warm">
+              <h4 className="font-semibold text-champagne text-sm">{zoomedImage.title}</h4>
               <button
                 onClick={() => setZoomedImage(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                className="p-1 rounded-lg text-champagne-muted hover:text-champagne hover:bg-elevated cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="relative aspect-[16/10] bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center">
+            <div className="relative aspect-[16/10] bg-app rounded-xl overflow-hidden flex items-center justify-center">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={zoomedImage.url}
@@ -474,7 +471,7 @@ export default function ReviewTable({
                 className="max-h-[70vh] w-auto object-contain"
               />
             </div>
-            <p className="text-xs text-slate-400 text-center">
+            <p className="text-xs text-champagne-muted text-center">
               Compare this original card photo with the extracted fields to verify details.
             </p>
           </div>
@@ -486,11 +483,6 @@ export default function ReviewTable({
 
 /**
  * Subcomponent for each inline editable table cell
- * Implements:
- * - Click to edit inline (no modal)
- * - Enter / Blur to commit, Escape to cancel
- * - Visible yellow border flag if confidence < 0.6 (functional, driven by confidence object)
- * - Tooltip/Badge with exact confidence score
  */
 interface EditableCellProps {
   itemId: string;
@@ -530,10 +522,10 @@ function EditableCell({
           onBlur={onCommit}
           onKeyDown={onKeyDown}
           autoFocus
-          className="w-full px-2.5 py-1 text-xs rounded-md bg-slate-900 border-2 border-indigo-500 text-white focus:outline-none shadow-sm"
+          className="w-full px-2.5 py-1 text-xs rounded-md bg-elevated border-2 border-brass text-champagne focus:outline-none shadow-sm"
           placeholder={placeholder}
         />
-        <span className="text-[10px] text-slate-500 mt-0.5 block">Press Enter ↵ to save, Esc to cancel</span>
+        <span className="text-[10px] text-champagne-muted mt-0.5 block">Press Enter ↵ to save, Esc to cancel</span>
       </div>
     );
   }
@@ -543,8 +535,8 @@ function EditableCell({
       onClick={() => onStartEdit(value)}
       className={`group/cell relative px-2.5 py-1.5 rounded-lg border transition-all duration-200 cursor-pointer select-none flex items-center justify-between gap-1.5 ${
         isLow
-          ? "border-amber-400/90 bg-amber-500/10 text-amber-200 shadow-xs shadow-amber-500/10 hover:border-amber-300"
-          : "border-transparent hover:border-slate-700 hover:bg-slate-900/60 text-slate-200"
+          ? "border-warning bg-warning/10 text-amber-200 shadow-xs shadow-warning/10 hover:border-amber-300"
+          : "border-transparent hover:border-border-warm hover:bg-elevated/60 text-champagne"
       }`}
       title={
         isLow
@@ -552,20 +544,20 @@ function EditableCell({
           : `OCR Confidence: ${confPercent}%. Click to edit inline.`
       }
     >
-      <span className={`truncate ${!value ? "italic text-slate-500" : ""}`}>
+      <span className={`truncate ${!value ? "italic text-champagne-muted/60" : ""}`}>
         {value || "(blank)"}
       </span>
 
       {/* Confidence Pill / Warning Flag */}
       <div className="flex items-center gap-1 shrink-0">
         {isLow && (
-          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-400 text-slate-950 border border-amber-300 shadow-xs">
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-warning text-slate-950 border border-amber-300 shadow-xs">
             <AlertTriangle className="w-2.5 h-2.5 text-slate-950" />
             <span>{confPercent}%</span>
           </span>
         )}
         {!isLow && confPercent !== null && (
-          <span className="opacity-0 group-hover/cell:opacity-100 text-[10px] text-slate-500 transition-opacity">
+          <span className="opacity-0 group-hover/cell:opacity-100 text-[10px] text-champagne-muted transition-opacity">
             {confPercent}%
           </span>
         )}

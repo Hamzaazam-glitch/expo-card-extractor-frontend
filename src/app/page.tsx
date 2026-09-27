@@ -264,7 +264,7 @@ function ExpoCardExtractorApp() {
   const hasDoneOrFailed = items.some((i) => i.status === "done" || i.status === "failed");
 
   return (
-    <div className="relative min-h-screen bg-slate-950 text-slate-100 selection:bg-indigo-500 selection:text-white flex flex-col font-sans">
+    <div className="relative min-h-screen bg-app text-champagne selection:bg-brass selection:text-app flex flex-col font-sans">
       {/* Background Three.js subtle visual flair */}
       <ThreeCanvas />
 
@@ -336,9 +336,9 @@ function ExpoCardExtractorApp() {
       </main>
 
       {/* Footer */}
-      <footer className="relative z-10 border-t border-slate-900 bg-slate-950/80 py-6 text-center text-xs text-slate-500">
+      <footer className="relative z-10 border-t border-border-warm bg-surface/80 py-6 text-center text-xs text-champagne-muted">
         <p>
-          Expo Card Extractor • Next.js App Router + TypeScript + Tailwind CSS + Framer Motion
+          Expo Card Extractor • Obsidian &amp; Brass Theme • Next.js App Router + TypeScript + Tailwind CSS
         </p>
       </footer>
     </div>

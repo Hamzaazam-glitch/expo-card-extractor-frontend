@@ -1,26 +1,56 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Obsidian & Brass Theme Tokens */
+  --color-app: #0c0a09;
+  --color-surface: #141210;
+  --color-elevated: #1d1916;
+  --color-border-warm: #2f2720;
+  --color-border-subtle: #241e1a;
+
+  --color-brass: #b8823d;
+  --color-brass-hover: #cb9348;
+  --color-brass-muted: #845e2c;
+
+  --color-champagne: #ecdcc7;
+  --color-champagne-muted: #a89886;
+
+  /* Functional Status Colors (Preserved) */
+  --color-warning: #f59e0b;
+  --color-error: #f43f5e;
+  --color-success: #10b981;
+
+  --background: #0c0a09;
+  --foreground: #ecdcc7;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+
+  --color-app: var(--color-app);
+  --color-surface: var(--color-surface);
+  --color-elevated: var(--color-elevated);
+  --color-border-warm: var(--color-border-warm);
+  --color-border-subtle: var(--color-border-subtle);
+
+  --color-brass: var(--color-brass);
+  --color-brass-hover: var(--color-brass-hover);
+  --color-brass-muted: var(--color-brass-muted);
+
+  --color-champagne: var(--color-champagne);
+  --color-champagne-muted: var(--color-champagne-muted);
+
+  --color-warning: var(--color-warning);
+  --color-error: var(--color-error);
+  --color-success: var(--color-success);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: #0c0a09;
+  color: #ecdcc7;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
