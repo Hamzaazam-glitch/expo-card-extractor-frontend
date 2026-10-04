@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "src/app/spike/**",
+    "src/app/api/save-annotated/**",
+    "src/utils/imageProcessing.ts",
   ]),
 ]);
 
