@@ -12,6 +12,7 @@ import {
   X,
   Maximize2,
   Loader2,
+  Image as ImageIcon,
 } from "lucide-react";
 import { CardItem, ExtractedCardData, SourceType, TableFilter } from "@/types/extractor";
 import { isAllFieldsNull, isLowConfidence } from "@/services/extractorService";
@@ -274,21 +275,11 @@ export default function ReviewTable({
                       {/* Column 2: Thumbnail with Click-to-Zoom & Save Status */}
                       <td className="py-3.5 px-4 align-middle">
                         <div className="flex items-center gap-3">
-                          <div
-                            onClick={() => setZoomedImage({ url: item.previewUrl, title: item.fileName })}
-                            className="relative w-16 h-11 rounded-lg overflow-hidden border border-border-warm bg-app cursor-pointer group/thumb shadow-sm hover:border-brass transition-colors shrink-0"
-                            title="Click to view full size"
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={item.previewUrl}
-                              alt={item.fileName}
-                              className="w-full h-full object-cover group-hover/thumb:scale-110 transition-transform duration-200"
-                            />
-                            <div className="absolute inset-0 bg-app/50 opacity-0 group-hover/thumb:opacity-100 flex items-center justify-center transition-opacity">
-                              <Maximize2 className="w-3.5 h-3.5 text-champagne" />
-                            </div>
-                          </div>
+                          <ThumbnailCell
+                            previewUrl={item.previewUrl}
+                            fileName={item.fileName}
+                            onZoom={(url, title) => setZoomedImage({ url, title })}
+                          />
                           <div className="flex flex-col min-w-0">
                             <span className="text-xs font-medium text-champagne truncate max-w-[130px]" title={item.fileName}>
                               {item.fileName}
@@ -620,3 +611,50 @@ function EditableCell({
     </div>
   );
 }
+
+/**
+ * Subcomponent for row thumbnail with themed fallback when storage_url is null or expired
+ */
+function ThumbnailCell({
+  previewUrl,
+  fileName,
+  onZoom,
+}: {
+  previewUrl: string;
+  fileName: string;
+  onZoom: (url: string, title: string) => void;
+}) {
+  const [imgError, setImgError] = useState(false);
+  const hasImage = Boolean(previewUrl) && !imgError;
+
+  return (
+    <div
+      onClick={() => hasImage && onZoom(previewUrl, fileName)}
+      className={`relative w-16 h-11 rounded-lg overflow-hidden border border-border-warm bg-app shrink-0 transition-colors ${
+        hasImage ? "cursor-pointer group/thumb hover:border-brass shadow-sm" : "cursor-default"
+      }`}
+      title={hasImage ? "Click to view full size" : "No image preview available"}
+    >
+      {hasImage ? (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={previewUrl}
+            alt={fileName}
+            onError={() => setImgError(true)}
+            className="w-full h-full object-cover group-hover/thumb:scale-110 transition-transform duration-200"
+          />
+          <div className="absolute inset-0 bg-app/50 opacity-0 group-hover/thumb:opacity-100 flex items-center justify-center transition-opacity">
+            <Maximize2 className="w-3.5 h-3.5 text-champagne" />
+          </div>
+        </>
+      ) : (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-elevated/70 text-brass/70 border border-border-warm/40">
+          <ImageIcon className="w-4 h-4 text-brass/60" />
+          <span className="text-[8px] text-champagne-muted/70 font-mono mt-0.5">No image</span>
+        </div>
+      )}
+    </div>
+  );
+}
+

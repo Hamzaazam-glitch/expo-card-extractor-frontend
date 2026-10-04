@@ -23,12 +23,27 @@ export interface ExtractedCardData {
 export type ProcessingStatus = "queued" | "processing" | "done" | "failed";
 export type SaveStatus = "idle" | "saving" | "saved" | "failed";
 
+export interface BackendRecord {
+  id?: string;
+  image_id: string;
+  company_name: string | null;
+  email: string | null;
+  phone: string | null;
+  website: string | null;
+  confidence: FieldConfidence;
+  source_type: SourceType;
+  reviewed: boolean;
+  storage_url: string | null;
+}
+
 export interface CardItem {
   id: string;
   fileName: string;
   fileSize: number;
   fileType: string;
   previewUrl: string;
+  storageUrl?: string | null;
+  isRestored?: boolean;
   file?: File;
   status: ProcessingStatus;
   progress?: number; // 0-100%

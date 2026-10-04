@@ -9,12 +9,86 @@ import ProcessingTracker from "@/components/ProcessingTracker";
 import ReviewTable from "@/components/ReviewTable";
 import ExportBar from "@/components/ExportBar";
 import { ToastProvider, useToast } from "@/components/Toast";
-import { CardItem, ExtractedCardData, SourceType } from "@/types/extractor";
+import { BackendRecord, CardItem, ExtractedCardData, SourceType } from "@/types/extractor";
 import {
   extractCardData,
   generateUUID,
+  getRecords,
   patchRecord,
 } from "@/services/extractorService";
+
+function mergeBackendRecords(prevItems: CardItem[], records: BackendRecord[]): CardItem[] {
+  // Map current items by image_id
+  const existingByImageId = new Map<string, CardItem>();
+  for (const item of prevItems) {
+    const imgId = item.data?.image_id;
+    if (imgId) {
+      existingByImageId.set(imgId, item);
+    }
+  }
+
+  const incomingImageIds = new Set<string>();
+
+  // Build list of records from backend (newest first)
+  const mergedBackendItems: CardItem[] = records.map((record) => {
+    incomingImageIds.add(record.image_id);
+    const existing = existingByImageId.get(record.image_id);
+
+    // If item in current session is queued/processing or in the middle of saving, keep current state
+    if (
+      existing &&
+      (existing.status === "queued" ||
+        existing.status === "processing" ||
+        existing.saveStatus === "saving")
+    ) {
+      return existing;
+    }
+
+    // If row exists in current session, preserve its local blob previewUrl
+    const previewUrl =
+      existing?.previewUrl && existing.previewUrl.startsWith("blob:")
+        ? existing.previewUrl
+        : record.storage_url || "";
+
+    return {
+      id: existing ? existing.id : generateUUID(),
+      fileName: existing
+        ? existing.fileName
+        : record.image_id
+        ? record.image_id.slice(0, 8)
+        : "restored",
+      fileSize: existing ? existing.fileSize : 0,
+      fileType: existing ? existing.fileType : "image/jpeg",
+      previewUrl,
+      storageUrl: record.storage_url,
+      file: existing?.file,
+      isRestored: !existing,
+      status: "done",
+      isReviewed: Boolean(record.reviewed),
+      sourceType: record.source_type || "card",
+      saveStatus: existing?.saveStatus === "failed" ? "failed" : "idle",
+      saveError: existing?.saveError,
+      createdAt: existing ? existing.createdAt : Date.now(),
+      data: {
+        image_id: record.image_id,
+        company_name: record.company_name,
+        email: record.email,
+        phone: record.phone,
+        website: record.website,
+        confidence: record.confidence,
+        source_type: record.source_type,
+      },
+    };
+  });
+
+  // Also keep any active items in current session not yet in backend (e.g. queued or failed before upload)
+  const unpersistedSessionItems = prevItems.filter((i) => {
+    const imgId = i.data?.image_id;
+    return !imgId || !incomingImageIds.has(imgId);
+  });
+
+  return [...unpersistedSessionItems, ...mergedBackendItems];
+}
 
 function ExpoCardExtractorApp() {
   const [items, setItems] = useState<CardItem[]>([]);
@@ -39,7 +113,54 @@ function ExpoCardExtractorApp() {
   >(new Map());
 
   const [isExtractingAll, setIsExtractingAll] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const { showToast } = useToast();
+
+  // Initial fetch on mount with image_id deduplication
+  React.useEffect(() => {
+    let active = true;
+    getRecords()
+      .then((records) => {
+        if (!active) return;
+        setItems((prev) => mergeBackendRecords(prev, records));
+      })
+      .catch((err: unknown) => {
+        if (!active) return;
+        const msg = err instanceof Error ? err.message : "Could not load saved records";
+        showToast({
+          type: "error",
+          title: "Could not load saved records",
+          description: `${msg}. You can continue uploading or click Refresh to retry.`,
+        });
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [showToast]);
+
+  // Manual refresh handler
+  const handleManualRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      const records = await getRecords();
+      setItems((prev) => mergeBackendRecords(prev, records));
+      showToast({
+        type: "success",
+        title: "Records Refreshed",
+        description: `Loaded ${records.length} saved record${records.length === 1 ? "" : "s"} from backend.`,
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Could not load saved records";
+      showToast({
+        type: "error",
+        title: "Could not load saved records",
+        description: `${msg}. You can continue uploading or click Refresh to retry.`,
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [showToast]);
 
   // Add files to queue (non-blocking)
   const handleAddFiles = useCallback((files: File[]) => {
@@ -375,6 +496,8 @@ function ExpoCardExtractorApp() {
       <HeroHeader
         items={items}
         onClearAll={handleClearAll}
+        onRefresh={handleManualRefresh}
+        isRefreshing={isRefreshing}
       />
 
       {/* Main Container */}

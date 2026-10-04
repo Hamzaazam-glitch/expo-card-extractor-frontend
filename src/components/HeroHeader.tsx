@@ -1,15 +1,17 @@
 "use client";
 
 import React from "react";
-import { Sparkles, ScanLine, CheckSquare, AlertTriangle, Layers, RotateCcw } from "lucide-react";
+import { Sparkles, ScanLine, CheckSquare, AlertTriangle, Layers, RotateCcw, RotateCw } from "lucide-react";
 import { CardItem } from "@/types/extractor";
 
 interface HeroHeaderProps {
   items: CardItem[];
   onClearAll: () => void;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
 }
 
-export default function HeroHeader({ items, onClearAll }: HeroHeaderProps) {
+export default function HeroHeader({ items, onClearAll, onRefresh, isRefreshing }: HeroHeaderProps) {
   const total = items.length;
   const processing = items.filter((i) => i.status === "processing" || i.status === "queued").length;
   const completed = items.filter((i) => i.status === "done").length;
@@ -45,6 +47,18 @@ export default function HeroHeader({ items, onClearAll }: HeroHeaderProps) {
 
           {/* Action buttons */}
           <div className="flex items-center gap-3 flex-wrap">
+            {onRefresh && (
+              <button
+                onClick={onRefresh}
+                disabled={isRefreshing}
+                className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-sm font-medium bg-elevated hover:bg-surface text-champagne border border-border-warm hover:border-brass/50 transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                title="Refetch all saved records from backend GET /records"
+              >
+                <RotateCw className={`w-4 h-4 text-brass ${isRefreshing ? "animate-spin" : ""}`} />
+                <span>{isRefreshing ? "Refreshing..." : "Refresh"}</span>
+              </button>
+            )}
+
             {total > 0 && (
               <button
                 onClick={onClearAll}

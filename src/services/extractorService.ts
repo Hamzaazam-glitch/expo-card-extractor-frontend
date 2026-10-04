@@ -1,4 +1,4 @@
-import { ExtractedCardData, FieldConfidence, SourceType } from "@/types/extractor";
+import { BackendRecord, ExtractedCardData, FieldConfidence, SourceType } from "@/types/extractor";
 
 export const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
@@ -230,3 +230,72 @@ export async function patchRecord(
     throw new Error(`PATCH /records/${id} failed with HTTP ${res.status}`);
   }
 }
+
+/**
+ * Fetches all saved records from GET /records.
+ * Backend contract: returns newest first (empty DB returns []).
+ * Keys: id, image_id, company_name, email, phone, website, confidence {4 keys},
+ * source_type, reviewed, storage_url (signed 1h or null).
+ */
+export async function getRecords(): Promise<BackendRecord[]> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/records`, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+      },
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`Failed to connect to backend GET /records: ${msg}`);
+  }
+
+  if (!res.ok) {
+    let errorDetail = `HTTP ${res.status}`;
+    try {
+      const errJson = await res.json();
+      if (errJson?.detail) {
+        errorDetail = typeof errJson.detail === "string" ? errJson.detail : JSON.stringify(errJson.detail);
+      }
+    } catch {
+      // fallback
+    }
+    throw new Error(`GET /records failed (${res.status}): ${errorDetail}`);
+  }
+
+  const raw = await res.json();
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  return raw.map((item: Record<string, unknown>): BackendRecord => {
+    const rawConf = (item.confidence && typeof item.confidence === "object" ? item.confidence : {}) as Record<string, unknown>;
+    const confidence: FieldConfidence = {
+      company_name: typeof rawConf.company_name === "number" ? rawConf.company_name : 0.0,
+      email: typeof rawConf.email === "number" ? rawConf.email : 0.0,
+      phone: typeof rawConf.phone === "number" ? rawConf.phone : 0.0,
+      website: typeof rawConf.website === "number" ? rawConf.website : 0.0,
+    };
+
+    const validSourceTypes: SourceType[] = ["card", "paper", "panaflex"];
+    const rawSourceType = String(item.source_type || "card").toLowerCase();
+    const sourceType: SourceType = validSourceTypes.includes(rawSourceType as SourceType)
+      ? (rawSourceType as SourceType)
+      : "card";
+
+    return {
+      id: typeof item.id === "string" ? item.id : String(item.image_id || ""),
+      image_id: String(item.image_id || ""),
+      company_name: typeof item.company_name === "string" ? item.company_name : null,
+      email: typeof item.email === "string" ? item.email : null,
+      phone: typeof item.phone === "string" ? item.phone : null,
+      website: typeof item.website === "string" ? item.website : null,
+      confidence,
+      source_type: sourceType,
+      reviewed: Boolean(item.reviewed),
+      storage_url: typeof item.storage_url === "string" ? item.storage_url : null,
+    };
+  });
+}
+
