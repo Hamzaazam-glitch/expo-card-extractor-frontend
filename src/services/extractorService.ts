@@ -50,6 +50,7 @@ export function generateUUID(): string {
  */
 export async function extractCardData(
   fileOrInput: File | Blob | { name: string; file?: File; previewUrl?: string },
+  requestedSourceType: SourceType = "card",
   shouldSimulateFailure = false
 ): Promise<ExtractedCardData> {
   if (shouldSimulateFailure) {
@@ -98,8 +99,7 @@ export async function extractCardData(
     throw new Error("Backend upload response did not include 'image_id'");
   }
 
-  // Step 2: Extract data using image_id (POST {BASE_URL}/extract)
-  // Note: source_type is omitted so backend defaults it as requested
+  // Step 2: Extract data using image_id and selected source_type (POST {BASE_URL}/extract)
   let extractRes: Response;
   try {
     extractRes = await fetch(`${API_BASE_URL}/extract`, {
@@ -109,6 +109,7 @@ export async function extractCardData(
       },
       body: JSON.stringify({
         image_id: imageId,
+        source_type: requestedSourceType,
       }),
     });
   } catch (err: unknown) {
@@ -158,8 +159,8 @@ export async function extractCardData(
   };
 
   const validSourceTypes: SourceType[] = ["card", "paper", "panaflex"];
-  const rawSourceType = String(extractData?.source_type || "card").toLowerCase();
-  const sourceType: SourceType = validSourceTypes.includes(rawSourceType as SourceType)
+  const rawSourceType = String(extractData?.source_type || requestedSourceType || "card").toLowerCase();
+  const normalizedSourceType: SourceType = validSourceTypes.includes(rawSourceType as SourceType)
     ? (rawSourceType as SourceType)
     : "card";
 
@@ -170,7 +171,7 @@ export async function extractCardData(
     phone: extractData.phone ?? null,
     website: extractData.website ?? null,
     confidence,
-    source_type: sourceType,
+    source_type: normalizedSourceType,
   };
 }
 
@@ -192,4 +193,40 @@ export function isAllFieldsNull(data: ExtractedCardData | null | undefined): boo
  */
 export function isLowConfidence(confidenceScore: number | undefined): boolean {
   return typeof confidenceScore === "number" && confidenceScore < 0.6;
+}
+
+export interface PatchRecordFields {
+  company_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  website?: string | null;
+}
+
+/**
+ * Persists manual field edits via PATCH /records/{id}.
+ * API contract: Accepts any subset of extracted fields; frontend restricts to
+ * company_name, email, phone, website ONLY.
+ * Treats any non-2xx or network error as failed; does not depend on response body.
+ */
+export async function patchRecord(
+  id: string,
+  fields: PatchRecordFields
+): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/records/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(fields),
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`PATCH /records/${id} network error: ${msg}`);
+  }
+
+  if (!res.ok) {
+    throw new Error(`PATCH /records/${id} failed with HTTP ${res.status}`);
+  }
 }

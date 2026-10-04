@@ -1,14 +1,15 @@
 "use client";
 
 import React, { useState, useRef, useCallback } from "react";
-import { UploadCloud, Image as ImageIcon, X, AlertCircle, Play, Sparkles } from "lucide-react";
-import { CardItem } from "@/types/extractor";
+import { UploadCloud, Image as ImageIcon, X, AlertCircle, Play } from "lucide-react";
+import { CardItem, SourceType } from "@/types/extractor";
 
 interface UploadZoneProps {
   items: CardItem[];
   onAddFiles: (files: File[]) => void;
   onRemoveItem: (id: string) => void;
   onExtractAll: () => void;
+  onUpdateSourceType?: (id: string, sourceType: SourceType) => void;
   isExtracting: boolean;
 }
 
@@ -21,6 +22,7 @@ export default function UploadZone({
   onAddFiles,
   onRemoveItem,
   onExtractAll,
+  onUpdateSourceType,
   isExtracting,
 }: UploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
@@ -265,6 +267,22 @@ export default function UploadZone({
                   <p className="text-[10px] text-champagne-muted mt-0.5">
                     {(item.fileSize / 1024).toFixed(0)} KB
                   </p>
+                  {(item.status === "queued" || item.status === "failed") && (
+                    <div className="mt-1.5 pt-1.5 border-t border-border-warm/60 flex items-center justify-between gap-1">
+                      <label className="text-[10px] text-champagne-muted">Type:</label>
+                      <select
+                        value={item.sourceType || "card"}
+                        onChange={(e) => onUpdateSourceType?.(item.id, e.target.value as SourceType)}
+                        className="bg-elevated border border-border-warm rounded px-1.5 py-0.5 text-[10px] text-champagne focus:outline-none focus:border-brass cursor-pointer"
+                        onClick={(e) => e.stopPropagation()}
+                        title="Select document source type for extraction"
+                      >
+                        <option value="card">Card</option>
+                        <option value="paper">Paper Flyer</option>
+                        <option value="panaflex">Panaflex</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

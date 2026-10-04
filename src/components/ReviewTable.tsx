@@ -4,12 +4,14 @@ import React, { useState } from "react";
 import {
   Check,
   AlertTriangle,
+  AlertCircle,
   RotateCw,
   Search,
   FileQuestion,
   Trash2,
   X,
-  Maximize2
+  Maximize2,
+  Loader2,
 } from "lucide-react";
 import { CardItem, ExtractedCardData, SourceType, TableFilter } from "@/types/extractor";
 import { isAllFieldsNull, isLowConfidence } from "@/services/extractorService";
@@ -21,10 +23,11 @@ interface ReviewTableProps {
     field: keyof Omit<ExtractedCardData, "confidence" | "image_id" | "source_type">,
     value: string
   ) => void;
-  onUpdateSourceType: (id: string, sourceType: SourceType) => void;
+  onUpdateSourceType?: (id: string, sourceType: SourceType) => void;
   onToggleReviewed: (id: string) => void;
   onRetryRow: (id: string) => void;
   onDeleteRow: (id: string) => void;
+  onRetrySave?: (id: string) => void;
 }
 
 export default function ReviewTable({
@@ -34,6 +37,7 @@ export default function ReviewTable({
   onToggleReviewed,
   onRetryRow,
   onDeleteRow,
+  onRetrySave,
 }: ReviewTableProps) {
   // Editing state: { id: string, field: string } | null
   const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
@@ -237,6 +241,7 @@ export default function ReviewTable({
                   const isFailed = item.status === "failed";
                   const data = item.data;
                   const isUnreadable = isAllFieldsNull(data);
+                  const isEditable = isDone && Boolean(data?.image_id);
 
                   return (
                     <tr
@@ -266,21 +271,54 @@ export default function ReviewTable({
                         </label>
                       </td>
 
-                      {/* Column 2: Thumbnail with Click-to-Zoom */}
+                      {/* Column 2: Thumbnail with Click-to-Zoom & Save Status */}
                       <td className="py-3.5 px-4 align-middle">
-                        <div
-                          onClick={() => setZoomedImage({ url: item.previewUrl, title: item.fileName })}
-                          className="relative w-16 h-11 rounded-lg overflow-hidden border border-border-warm bg-app cursor-pointer group/thumb shadow-sm hover:border-brass transition-colors"
-                          title="Click to view full size"
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={item.previewUrl}
-                            alt={item.fileName}
-                            className="w-full h-full object-cover group-hover/thumb:scale-110 transition-transform duration-200"
-                          />
-                          <div className="absolute inset-0 bg-app/50 opacity-0 group-hover/thumb:opacity-100 flex items-center justify-center transition-opacity">
-                            <Maximize2 className="w-3.5 h-3.5 text-champagne" />
+                        <div className="flex items-center gap-3">
+                          <div
+                            onClick={() => setZoomedImage({ url: item.previewUrl, title: item.fileName })}
+                            className="relative w-16 h-11 rounded-lg overflow-hidden border border-border-warm bg-app cursor-pointer group/thumb shadow-sm hover:border-brass transition-colors shrink-0"
+                            title="Click to view full size"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={item.previewUrl}
+                              alt={item.fileName}
+                              className="w-full h-full object-cover group-hover/thumb:scale-110 transition-transform duration-200"
+                            />
+                            <div className="absolute inset-0 bg-app/50 opacity-0 group-hover/thumb:opacity-100 flex items-center justify-center transition-opacity">
+                              <Maximize2 className="w-3.5 h-3.5 text-champagne" />
+                            </div>
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-xs font-medium text-champagne truncate max-w-[130px]" title={item.fileName}>
+                              {item.fileName}
+                            </span>
+                            {item.saveStatus === "saving" && (
+                              <span className="inline-flex items-center gap-1 text-[11px] text-brass animate-pulse font-medium mt-0.5">
+                                <Loader2 className="w-3 h-3 animate-spin" /> Saving...
+                              </span>
+                            )}
+                            {item.saveStatus === "saved" && (
+                              <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-medium mt-0.5">
+                                <Check className="w-3 h-3" /> Saved
+                              </span>
+                            )}
+                            {item.saveStatus === "failed" && (
+                              <span className="inline-flex items-center gap-1 text-[11px] text-rose-400 font-medium mt-0.5">
+                                <AlertCircle className="w-3 h-3 shrink-0" />
+                                <span>Unsaved</span>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onRetrySave?.(item.id);
+                                  }}
+                                  className="ml-1 px-1.5 py-0.2 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 underline cursor-pointer"
+                                  title="Retry saving edits to backend"
+                                >
+                                  Retry
+                                </button>
+                              </span>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -288,17 +326,30 @@ export default function ReviewTable({
                       {/* If the item failed extraction entirely */}
                       {isFailed ? (
                         <td colSpan={5} className="py-3.5 px-4 align-middle">
-                          <div className="flex items-center justify-between p-2.5 rounded-lg bg-error/10 border border-error/30 text-rose-300">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-lg bg-error/10 border border-error/30 text-rose-300">
                             <span className="text-xs">
                               {item.errorMessage || "Extraction failed. Click retry to run OCR again."}
                             </span>
-                            <button
-                              onClick={() => onRetryRow(item.id)}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-error hover:bg-rose-500 text-white text-xs font-semibold cursor-pointer"
-                            >
-                              <RotateCw className="w-3 h-3" />
-                              <span>Retry</span>
-                            </button>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-xs text-champagne-muted">Type:</span>
+                              <select
+                                value={item.sourceType || "card"}
+                                onChange={(e) => onUpdateSourceType?.(item.id, e.target.value as SourceType)}
+                                className="bg-elevated border border-border-warm rounded px-2 py-1 text-xs text-champagne focus:outline-none focus:border-brass cursor-pointer"
+                                title="Select source type before retry"
+                              >
+                                <option value="card">Card</option>
+                                <option value="paper">Paper Flyer</option>
+                                <option value="panaflex">Panaflex</option>
+                              </select>
+                              <button
+                                onClick={() => onRetryRow(item.id)}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-error hover:bg-rose-500 text-white text-xs font-semibold cursor-pointer"
+                              >
+                                <RotateCw className="w-3 h-3" />
+                                <span>Retry</span>
+                              </button>
+                            </div>
                           </div>
                         </td>
                       ) : isUnreadable ? (
@@ -335,6 +386,7 @@ export default function ReviewTable({
                               value={data?.company_name ?? null}
                               confidence={data?.confidence.company_name}
                               isEditing={editingCell?.id === item.id && editingCell?.field === "company_name"}
+                              isEditable={isEditable}
                               tempValue={tempValue}
                               placeholder="Enter company name..."
                               onStartEdit={(val) => startEditing(item.id, "company_name", val)}
@@ -352,6 +404,7 @@ export default function ReviewTable({
                               value={data?.email ?? null}
                               confidence={data?.confidence.email}
                               isEditing={editingCell?.id === item.id && editingCell?.field === "email"}
+                              isEditable={isEditable}
                               tempValue={tempValue}
                               placeholder="Enter email address..."
                               onStartEdit={(val) => startEditing(item.id, "email", val)}
@@ -369,6 +422,7 @@ export default function ReviewTable({
                               value={data?.phone ?? null}
                               confidence={data?.confidence.phone}
                               isEditing={editingCell?.id === item.id && editingCell?.field === "phone"}
+                              isEditable={isEditable}
                               tempValue={tempValue}
                               placeholder="Enter phone number..."
                               onStartEdit={(val) => startEditing(item.id, "phone", val)}
@@ -386,6 +440,7 @@ export default function ReviewTable({
                               value={data?.website ?? null}
                               confidence={data?.confidence.website}
                               isEditing={editingCell?.id === item.id && editingCell?.field === "website"}
+                              isEditable={isEditable}
                               tempValue={tempValue}
                               placeholder="Enter website url..."
                               onStartEdit={(val) => startEditing(item.id, "website", val)}
@@ -397,18 +452,12 @@ export default function ReviewTable({
                         </>
                       )}
 
-                      {/* Column 7: Source Type Dropdown */}
+                      {/* Column 7: Source Type (Read-only) */}
                       <td className="py-3.5 px-4 align-middle">
                         {data ? (
-                          <select
-                            value={data.source_type}
-                            onChange={(e) => onUpdateSourceType(item.id, e.target.value as SourceType)}
-                            className="bg-elevated border border-border-warm rounded-lg px-2.5 py-1 text-xs text-champagne focus:outline-none focus:border-brass cursor-pointer"
-                          >
-                            <option value="card">Card</option>
-                            <option value="paper">Paper Flyer</option>
-                            <option value="panaflex">Panaflex</option>
-                          </select>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-elevated text-champagne border border-border-warm capitalize">
+                            {data.source_type || item.sourceType || "card"}
+                          </span>
                         ) : (
                           <span className="text-champagne-muted/50">—</span>
                         )}
@@ -490,6 +539,7 @@ interface EditableCellProps {
   value: string | null;
   confidence?: number;
   isEditing: boolean;
+  isEditable?: boolean;
   tempValue: string;
   placeholder: string;
   onStartEdit: (val: string | null) => void;
@@ -502,6 +552,7 @@ function EditableCell({
   value,
   confidence,
   isEditing,
+  isEditable = true,
   tempValue,
   placeholder,
   onStartEdit,
@@ -532,14 +583,18 @@ function EditableCell({
 
   return (
     <div
-      onClick={() => onStartEdit(value)}
-      className={`group/cell relative px-2.5 py-1.5 rounded-lg border transition-all duration-200 cursor-pointer select-none flex items-center justify-between gap-1.5 ${
-        isLow
-          ? "border-warning bg-warning/10 text-amber-200 shadow-xs shadow-warning/10 hover:border-amber-300"
-          : "border-transparent hover:border-border-warm hover:bg-elevated/60 text-champagne"
+      onClick={() => isEditable && onStartEdit(value)}
+      className={`group/cell relative px-2.5 py-1.5 rounded-lg border transition-all duration-200 select-none flex items-center justify-between gap-1.5 ${
+        !isEditable
+          ? "border-transparent opacity-80 cursor-default"
+          : isLow
+          ? "border-warning bg-warning/10 text-amber-200 shadow-xs shadow-warning/10 hover:border-amber-300 cursor-pointer"
+          : "border-transparent hover:border-border-warm hover:bg-elevated/60 text-champagne cursor-pointer"
       }`}
       title={
-        isLow
+        !isEditable
+          ? "Row is not editable until extraction is complete."
+          : isLow
           ? `⚠️ Low OCR Confidence: ${confPercent}%. Click to verify or edit.`
           : `OCR Confidence: ${confPercent}%. Click to edit inline.`
       }

@@ -21,6 +21,7 @@ export interface ExtractedCardData {
 }
 
 export type ProcessingStatus = "queued" | "processing" | "done" | "failed";
+export type SaveStatus = "idle" | "saving" | "saved" | "failed";
 
 export interface CardItem {
   id: string;
@@ -36,6 +37,9 @@ export interface CardItem {
   isReviewed: boolean;
   createdAt: number;
   isUnreadable?: boolean;
+  sourceType?: SourceType;
+  saveStatus?: SaveStatus;
+  saveError?: string;
 }
 
 export type TableFilter = "all" | "needs_review" | "low_confidence" | "unreadable" | "reviewed";
