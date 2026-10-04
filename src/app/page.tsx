@@ -35,12 +35,13 @@ function mergeBackendRecords(prevItems: CardItem[], records: BackendRecord[]): C
     incomingImageIds.add(record.image_id);
     const existing = existingByImageId.get(record.image_id);
 
-    // If item in current session is queued/processing or in the middle of saving, keep current state
+    // If item in current session is queued/processing or has unsaved/failed/saving edits, keep current state
     if (
       existing &&
       (existing.status === "queued" ||
         existing.status === "processing" ||
-        existing.saveStatus === "saving")
+        existing.saveStatus === "saving" ||
+        existing.saveStatus === "failed")
     ) {
       return existing;
     }
@@ -325,6 +326,7 @@ function ExpoCardExtractorApp() {
             ...(queueEntry.queuedFields || {}),
             ...newFields,
             confidence: newFields.confidence || queueEntry.queuedFields?.confidence,
+            reviewed: newFields.reviewed !== undefined ? newFields.reviewed : queueEntry.queuedFields?.reviewed,
           },
         });
         return;
@@ -377,6 +379,7 @@ function ExpoCardExtractorApp() {
   );
 
   // Inline edit field updater (for company_name, email, phone, website ONLY)
+  // Clearing sends null with confidence 0.0. Edits send value with confidence 1.0. Full 4-key confidence always sent.
   const handleUpdateField = useCallback(
     (
       id: string,
@@ -389,33 +392,10 @@ function ExpoCardExtractorApp() {
       }
 
       const trimmedVal = value.trim();
+      const isClearing = !trimmedVal;
+      const targetValue = isClearing ? null : trimmedVal;
+      const newConfidenceForField = isClearing ? 0.0 : 1.0;
 
-      // HOLD Requirement 4(a): Clearing a field to null is NOT sent to backend.
-      // Show empty/needs-input locally, do NOT send PATCH, mark row "unsaved: clearing not supported yet". Never send "".
-      if (!trimmedVal) {
-        setItems((prev) =>
-          prev.map((item) => {
-            if (item.id !== id || !item.data) return item;
-            return {
-              ...item,
-              saveStatus: "failed",
-              saveError: "unsaved: clearing not supported yet",
-              data: {
-                ...item.data,
-                [field]: null,
-                confidence: {
-                  ...item.data.confidence,
-                  [field]: 0.0,
-                },
-              },
-            };
-          })
-        );
-        return;
-      }
-
-      // Requirement 3: Non-empty edit.
-      // Send confidence as FULL 4-key object (1.0 for edited field, current values for others).
       const currentConf = currentItem.data.confidence || {
         company_name: 0.0,
         email: 0.0,
@@ -424,13 +404,13 @@ function ExpoCardExtractorApp() {
       };
 
       const updatedConfidence: FieldConfidence = {
-        company_name: field === "company_name" ? 1.0 : (currentConf.company_name ?? 0.0),
-        email: field === "email" ? 1.0 : (currentConf.email ?? 0.0),
-        phone: field === "phone" ? 1.0 : (currentConf.phone ?? 0.0),
-        website: field === "website" ? 1.0 : (currentConf.website ?? 0.0),
+        company_name: field === "company_name" ? newConfidenceForField : (currentConf.company_name ?? 0.0),
+        email: field === "email" ? newConfidenceForField : (currentConf.email ?? 0.0),
+        phone: field === "phone" ? newConfidenceForField : (currentConf.phone ?? 0.0),
+        website: field === "website" ? newConfidenceForField : (currentConf.website ?? 0.0),
       };
 
-      // 1. Optimistic UI update: keep edit visible, update confidence
+      // 1. Optimistic UI update: keep edit visible, set saving status
       setItems((prev) =>
         prev.map((item) => {
           if (item.id !== id || !item.data) return item;
@@ -440,23 +420,23 @@ function ExpoCardExtractorApp() {
             saveError: undefined,
             data: {
               ...item.data,
-              [field]: trimmedVal,
+              [field]: targetValue,
               confidence: updatedConfidence,
             },
           };
         })
       );
 
-      // 2. Dispatch PATCH for this field with full 4-key confidence
+      // 2. Dispatch PATCH for this field with targetValue (null if cleared) + full 4-key confidence
       dispatchPatch(id, {
-        [field]: trimmedVal,
+        [field]: targetValue,
         confidence: updatedConfidence,
       });
     },
     [dispatchPatch]
   );
 
-  // Retry saving a failed row edit
+  // Retry saving a failed row edit or review status
   const handleRetrySave = useCallback(
     (id: string) => {
       const currentItem = itemsRef.current.find((i) => i.id === id);
@@ -471,11 +451,12 @@ function ExpoCardExtractorApp() {
 
       const patchData: PatchRecordFields = {
         confidence: currentItem.data.confidence,
+        reviewed: currentItem.isReviewed,
       };
-      if (currentItem.data.company_name) patchData.company_name = currentItem.data.company_name;
-      if (currentItem.data.email) patchData.email = currentItem.data.email;
-      if (currentItem.data.phone) patchData.phone = currentItem.data.phone;
-      if (currentItem.data.website) patchData.website = currentItem.data.website;
+      if (currentItem.data.company_name !== undefined) patchData.company_name = currentItem.data.company_name;
+      if (currentItem.data.email !== undefined) patchData.email = currentItem.data.email;
+      if (currentItem.data.phone !== undefined) patchData.phone = currentItem.data.phone;
+      if (currentItem.data.website !== undefined) patchData.website = currentItem.data.website;
 
       dispatchPatch(id, patchData);
     },
@@ -496,14 +477,43 @@ function ExpoCardExtractorApp() {
     );
   }, []);
 
-  // Toggle reviewed status
-  const handleToggleReviewed = useCallback((id: string) => {
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, isReviewed: !item.isReviewed } : item
-      )
-    );
-  }, []);
+  // Toggle reviewed status via PATCH { reviewed: true | false } only
+  const handleToggleReviewed = useCallback(
+    (id: string) => {
+      const currentItem = itemsRef.current.find((i) => i.id === id);
+      if (!currentItem || currentItem.status !== "done") {
+        return;
+      }
+
+      const nextReviewed = !currentItem.isReviewed;
+
+      // 1. Optimistic UI update with saving pill (does not block ticking while fields are empty)
+      setItems((prev) =>
+        prev.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                isReviewed: nextReviewed,
+                saveStatus: "saving",
+                saveError: undefined,
+              }
+            : item
+        )
+      );
+
+      // 2. Dispatch PATCH { reviewed: nextReviewed } if item has image_id
+      if (currentItem.data?.image_id) {
+        dispatchPatch(id, { reviewed: nextReviewed });
+      } else {
+        setItems((prev) =>
+          prev.map((item) =>
+            item.id === id ? { ...item, saveStatus: "saved" } : item
+          )
+        );
+      }
+    },
+    [dispatchPatch]
+  );
 
   // Delete row
   const handleDeleteRow = useCallback(

@@ -340,18 +340,16 @@ export default function ReviewTable({
                                 <span className="inline-flex items-center gap-1 text-[11px] text-rose-400 font-medium mt-0.5" title={item.saveError}>
                                   <AlertCircle className="w-3 h-3 shrink-0" />
                                   <span className="truncate max-w-[140px]">{item.saveError || "Unsaved"}</span>
-                                  {item.saveError !== "unsaved: clearing not supported yet" && (
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        onRetrySave?.(item.id);
-                                      }}
-                                      className="ml-1 px-1.5 py-0.2 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 underline cursor-pointer shrink-0"
-                                      title="Retry saving edits to backend"
-                                    >
-                                      Retry
-                                    </button>
-                                  )}
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onRetrySave?.(item.id);
+                                    }}
+                                    className="ml-1 px-1.5 py-0.2 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 underline cursor-pointer shrink-0"
+                                    title="Retry saving edits to backend"
+                                  >
+                                    Retry
+                                  </button>
                                 </span>
                               )}
                             </div>

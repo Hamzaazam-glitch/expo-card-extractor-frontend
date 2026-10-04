@@ -203,12 +203,13 @@ export interface PatchRecordFields {
   phone?: string | null;
   website?: string | null;
   confidence?: FieldConfidence;
+  reviewed?: boolean;
 }
 
 /**
- * Persists manual field edits via PATCH /records/{id}.
+ * Persists manual field edits or review status via PATCH /records/{id}.
  * API contract: Accepts any subset of extracted fields; frontend restricts to
- * company_name, email, phone, website ONLY.
+ * company_name, email, phone, website, confidence, reviewed.
  * Treats any non-2xx or network error as failed; does not depend on response body.
  */
 export async function patchRecord(
@@ -237,13 +238,18 @@ export async function patchRecord(
 /**
  * Fetches all saved records from GET /records.
  * Backend contract: returns newest first (empty DB returns []).
+ * Optional ?reviewed=true|false filter query parameter.
  * Keys: id, image_id, company_name, email, phone, website, confidence {4 keys},
  * source_type, reviewed, storage_url (signed 1h or null).
  */
-export async function getRecords(): Promise<BackendRecord[]> {
+export async function getRecords(options?: { reviewed?: boolean }): Promise<BackendRecord[]> {
+  let url = `${API_BASE_URL}/records`;
+  if (options?.reviewed !== undefined) {
+    url += `?reviewed=${options.reviewed}`;
+  }
   let res: Response;
   try {
-    res = await fetch(`${API_BASE_URL}/records`, {
+    res = await fetch(url, {
       method: "GET",
       headers: {
         Accept: "application/json",

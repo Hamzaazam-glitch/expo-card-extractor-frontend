@@ -85,7 +85,7 @@ export function prepareExportData(
     const sourceType = cleanExportField(data.source_type ?? item.source_type ?? "card") || "card";
 
     // 3. Reviewed Status
-    const isReviewed = Boolean(item.isReviewed ?? (data as any)?.isReviewed ?? false);
+    const isReviewed = Boolean(item.isReviewed ?? item.reviewed ?? (data as any)?.isReviewed ?? (data as any)?.reviewed ?? false);
 
     // 4. Confidence Metrics (empty string if unavailable)
     const conf = data.confidence ?? item.confidence;
@@ -113,9 +113,11 @@ export function prepareExportData(
       if (typeof conf.website === "number") confWebsite = (conf.website * 100).toFixed(0) + "%";
     }
 
-    // 5. Identifiers & Source File
-    const fileName = cleanExportField(item.fileName ?? item.file_name);
-    const imageId = cleanExportField(data.image_id ?? item.image_id ?? item.id);
+    // 5. Identifiers & Source File (uses 8-char short ID if fileName not stored)
+    const rawImageId = String(data.image_id ?? item.image_id ?? item.id ?? "");
+    const imageId = cleanExportField(rawImageId);
+    const shortId = rawImageId ? rawImageId.slice(0, 8) : "";
+    const fileName = cleanExportField(item.fileName ?? item.file_name ?? shortId);
 
     return {
       "Company Name": companyName,
