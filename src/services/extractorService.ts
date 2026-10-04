@@ -188,14 +188,6 @@ export function isAllFieldsNull(data: ExtractedCardData | null | undefined): boo
   );
 }
 
-export const LOW_CONFIDENCE_THRESHOLD = 0.8;
-
-/**
- * Checks if a specific field has low confidence (< 0.8)
- */
-export function isLowConfidence(confidenceScore: number | undefined): boolean {
-  return typeof confidenceScore === "number" && confidenceScore < LOW_CONFIDENCE_THRESHOLD;
-}
 
 export interface PatchRecordFields {
   company_name?: string | null;

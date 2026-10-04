@@ -13,11 +13,6 @@ export interface ExportedCardRecord {
   Website: string;
   "Source Type": string;
   Reviewed: string;
-  "Confidence Avg": string;
-  "Confidence Company": string;
-  "Confidence Email": string;
-  "Confidence Phone": string;
-  "Confidence Website": string;
   "File Name": string;
   "Image ID": string;
 }
@@ -87,31 +82,6 @@ export function prepareExportData(
     // 3. Reviewed Status
     const isReviewed = Boolean(item.isReviewed ?? item.reviewed ?? (data as any)?.isReviewed ?? (data as any)?.reviewed ?? false);
 
-    // 4. Confidence Metrics (empty string if unavailable)
-    const conf = data.confidence ?? item.confidence;
-    let avgConfidence = "";
-    let confCompany = "";
-    let confEmail = "";
-    let confPhone = "";
-    let confWebsite = "";
-
-    if (conf && typeof conf === "object") {
-      const scores = [
-        conf.company_name,
-        conf.email,
-        conf.phone,
-        conf.website,
-      ].filter((s): s is number => typeof s === "number");
-
-      if (scores.length > 0) {
-        const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
-        avgConfidence = (avg * 100).toFixed(0) + "%";
-      }
-      if (typeof conf.company_name === "number") confCompany = (conf.company_name * 100).toFixed(0) + "%";
-      if (typeof conf.email === "number") confEmail = (conf.email * 100).toFixed(0) + "%";
-      if (typeof conf.phone === "number") confPhone = (conf.phone * 100).toFixed(0) + "%";
-      if (typeof conf.website === "number") confWebsite = (conf.website * 100).toFixed(0) + "%";
-    }
 
     // 5. Identifiers & Source File (uses 8-char short ID if fileName not stored)
     const rawImageId = String(data.image_id ?? item.image_id ?? item.id ?? "");
@@ -126,11 +96,6 @@ export function prepareExportData(
       Website: website,
       "Source Type": sourceType,
       Reviewed: isReviewed ? "Yes" : "No",
-      "Confidence Avg": avgConfidence,
-      "Confidence Company": confCompany,
-      "Confidence Email": confEmail,
-      "Confidence Phone": confPhone,
-      "Confidence Website": confWebsite,
       "File Name": fileName,
       "Image ID": imageId,
     };
@@ -210,11 +175,6 @@ export function exportToExcel(
     { wch: 28 }, // Website
     { wch: 14 }, // Source Type
     { wch: 12 }, // Reviewed
-    { wch: 16 }, // Confidence Avg
-    { wch: 18 }, // Conf Company
-    { wch: 16 }, // Conf Email
-    { wch: 16 }, // Conf Phone
-    { wch: 18 }, // Conf Website
     { wch: 26 }, // File Name
     { wch: 38 }, // Image ID
   ];

@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Expo Card Extractor — Intelligent OCR Lead Digitizer",
-  description: "High-speed OCR frontend for physical exhibition cards, paper flyers, and panaflex banners with confidence flagging.",
+  description: "High-speed OCR frontend for physical exhibition cards, paper flyers, and panaflex banners.",
 };
 
 export default function RootLayout({

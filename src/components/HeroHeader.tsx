@@ -1,9 +1,8 @@
 "use client";
 
 import React from "react";
-import { Sparkles, ScanLine, CheckSquare, AlertTriangle, Layers, RotateCcw, RotateCw, AlertCircle } from "lucide-react";
+import { Sparkles, ScanLine, CheckSquare, Layers, RotateCcw, RotateCw, AlertCircle } from "lucide-react";
 import { CardItem } from "@/types/extractor";
-import { LOW_CONFIDENCE_THRESHOLD } from "@/services/extractorService";
 
 interface HeroHeaderProps {
   items: CardItem[];
@@ -25,17 +24,6 @@ export default function HeroHeader({ items, onClearAll, onRefresh, isRefreshing 
     return !d.company_name || !d.email || !d.phone || !d.website;
   }).length;
   
-  // Count items with low confidence (< 0.8)
-  const lowConfidenceCount = items.filter((item) => {
-    if (item.status !== "done" || !item.data) return false;
-    const c = item.data.confidence;
-    return (
-      c.company_name < LOW_CONFIDENCE_THRESHOLD ||
-      c.email < LOW_CONFIDENCE_THRESHOLD ||
-      c.phone < LOW_CONFIDENCE_THRESHOLD ||
-      c.website < LOW_CONFIDENCE_THRESHOLD
-    );
-  }).length;
 
   return (
     <header className="relative z-10 pt-8 pb-6 border-b border-border-warm bg-surface/70 backdrop-blur-md">
@@ -54,7 +42,7 @@ export default function HeroHeader({ items, onClearAll, onRefresh, isRefreshing 
               <span>Expo Card Extractor</span>
             </h1>
             <p className="text-sm sm:text-base text-champagne-muted max-w-2xl">
-              Turn stacks of physical business cards, booth flyers, and panaflex banners into clean, verified lead data with OCR confidence validation.
+              Turn stacks of physical business cards, booth flyers, and panaflex banners into clean, verified lead data.
             </p>
           </div>
 
@@ -87,7 +75,7 @@ export default function HeroHeader({ items, onClearAll, onRefresh, isRefreshing 
 
         {/* Live Metrics Row */}
         {total > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 mt-6 pt-5 border-t border-border-warm/60">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3.5 mt-6 pt-5 border-t border-border-warm/60">
             <div className="p-3.5 rounded-xl bg-surface/90 border border-border-warm">
               <div className="flex items-center justify-between text-xs text-champagne-muted font-medium">
                 <span>Total Rows</span>
@@ -116,13 +104,6 @@ export default function HeroHeader({ items, onClearAll, onRefresh, isRefreshing 
               </p>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-surface/90 border border-border-warm">
-              <div className="flex items-center justify-between text-xs text-champagne-muted font-medium">
-                <span>Low Confidence (&lt;80%)</span>
-                <AlertTriangle className="w-4 h-4 text-warning" />
-              </div>
-              <p className="text-2xl font-bold text-warning mt-1">{lowConfidenceCount}</p>
-            </div>
 
             <div className="p-3.5 rounded-xl bg-surface/90 border border-border-warm">
               <div className="flex items-center justify-between text-xs text-champagne-muted font-medium">

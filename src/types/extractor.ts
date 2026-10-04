@@ -57,4 +57,4 @@ export interface CardItem {
   saveError?: string;
 }
 
-export type TableFilter = "all" | "needs_review" | "low_confidence" | "unreadable" | "reviewed";
+export type TableFilter = "all" | "needs_review" | "unreadable" | "reviewed";

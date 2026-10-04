@@ -15,7 +15,7 @@ import {
   Image as ImageIcon,
 } from "lucide-react";
 import { CardItem, ExtractedCardData, SourceType, TableFilter } from "@/types/extractor";
-import { isAllFieldsNull, isLowConfidence, LOW_CONFIDENCE_THRESHOLD } from "@/services/extractorService";
+import { isAllFieldsNull } from "@/services/extractorService";
 
 interface ReviewTableProps {
   items: CardItem[];
@@ -72,19 +72,15 @@ export default function ReviewTable({
       return item.isReviewed;
     }
     if (activeFilter === "needs_review") {
-      if (!item.isReviewed) return true;
       if (item.status === "failed") return true;
+      if (!item.isReviewed) return true;
+      if (item.data) {
+        const d = item.data;
+        if (!d.company_name || !d.email || !d.phone || !d.website) {
+          return true;
+        }
+      }
       return false;
-    }
-    if (activeFilter === "low_confidence") {
-      if (!item.data) return false;
-      const c = item.data.confidence;
-      return (
-        c.company_name < LOW_CONFIDENCE_THRESHOLD ||
-        c.email < LOW_CONFIDENCE_THRESHOLD ||
-        c.phone < LOW_CONFIDENCE_THRESHOLD ||
-        c.website < LOW_CONFIDENCE_THRESHOLD
-      );
     }
     if (activeFilter === "unreadable") {
       return isAllFieldsNull(item.data);
@@ -141,18 +137,7 @@ export default function ReviewTable({
                 : "bg-surface text-champagne-muted hover:text-champagne border border-border-warm"
             }`}
           >
-            Needs Review ({doneOrFailedItems.filter((i) => !i.isReviewed).length})
-          </button>
-          <button
-            onClick={() => setActiveFilter("low_confidence")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
-              activeFilter === "low_confidence"
-                ? "bg-amber-600 text-slate-950 font-bold shadow-sm"
-                : "bg-surface text-warning hover:text-amber-300 border border-border-warm"
-            }`}
-          >
-            <AlertTriangle className="w-3.5 h-3.5 text-warning" />
-            <span>Low Confidence (&lt;80%)</span>
+            Needs Review ({doneOrFailedItems.filter((i) => i.status === "failed" || !i.isReviewed || (i.data && (!i.data.company_name || !i.data.email || !i.data.phone || !i.data.website))).length})
           </button>
           <button
             onClick={() => setActiveFilter("unreadable")}
@@ -393,7 +378,6 @@ export default function ReviewTable({
                                 itemId={item.id}
                                 fieldName="company_name"
                                 value={data?.company_name ?? null}
-                                confidence={data?.confidence.company_name}
                                 isEditing={editingCell?.id === item.id && editingCell?.field === "company_name"}
                                 isEditable={isEditable}
                                 tempValue={tempValue}
@@ -411,7 +395,6 @@ export default function ReviewTable({
                                 itemId={item.id}
                                 fieldName="email"
                                 value={data?.email ?? null}
-                                confidence={data?.confidence.email}
                                 isEditing={editingCell?.id === item.id && editingCell?.field === "email"}
                                 isEditable={isEditable}
                                 tempValue={tempValue}
@@ -429,7 +412,6 @@ export default function ReviewTable({
                                 itemId={item.id}
                                 fieldName="phone"
                                 value={data?.phone ?? null}
-                                confidence={data?.confidence.phone}
                                 isEditing={editingCell?.id === item.id && editingCell?.field === "phone"}
                                 isEditable={isEditable}
                                 tempValue={tempValue}
@@ -447,7 +429,6 @@ export default function ReviewTable({
                                 itemId={item.id}
                                 fieldName="website"
                                 value={data?.website ?? null}
-                                confidence={data?.confidence.website}
                                 isEditing={editingCell?.id === item.id && editingCell?.field === "website"}
                                 isEditable={isEditable}
                                 tempValue={tempValue}
@@ -547,7 +528,6 @@ interface EditableCellProps {
   itemId: string;
   fieldName: string;
   value: string | null;
-  confidence?: number;
   isEditing: boolean;
   isEditable?: boolean;
   tempValue: string;
@@ -560,7 +540,6 @@ interface EditableCellProps {
 
 function EditableCell({
   value,
-  confidence,
   isEditing,
   isEditable = true,
   tempValue,
@@ -571,8 +550,6 @@ function EditableCell({
   onKeyDown,
 }: EditableCellProps) {
   const isEmpty = !value || value.trim() === "";
-  const isLow = isLowConfidence(confidence);
-  const confPercent = typeof confidence === "number" ? Math.round(confidence * 100) : null;
 
   if (isEditing) {
     return (
@@ -609,8 +586,6 @@ function EditableCell({
           ? "border-transparent opacity-80 cursor-default"
           : isEmpty
           ? "border-dashed border-amber-500/60 bg-amber-500/5 hover:border-amber-400 hover:bg-amber-500/10 cursor-pointer"
-          : isLow
-          ? "border-warning/50 bg-warning/10 text-amber-200 shadow-xs hover:border-amber-300 cursor-pointer"
           : "border-transparent hover:border-border-warm hover:bg-elevated/60 text-champagne cursor-pointer"
       }`}
       title={
@@ -618,9 +593,7 @@ function EditableCell({
           ? "Row is not editable until extraction is complete."
           : isEmpty
           ? `Missing field. Click to ${placeholder.toLowerCase()}.`
-          : isLow
-          ? `⚠️ Low OCR Confidence: ${confPercent}%. Click to verify or edit.`
-          : `OCR Confidence: ${confPercent}%. Click to edit inline.`
+          : "Click to edit inline."
       }
     >
       {isEmpty ? (
@@ -631,25 +604,14 @@ function EditableCell({
         <span className="truncate">{value}</span>
       )}
 
-      {/* Confidence Pill / Warning Flag */}
-      <div className="flex items-center gap-1 shrink-0">
-        {isEmpty && isEditable && (
+      {/* Empty input badge */}
+      {isEmpty && isEditable && (
+        <div className="flex items-center gap-1 shrink-0">
           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40">
             Needs input
           </span>
-        )}
-        {!isEmpty && isLow && (
-          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-warning text-slate-950 border border-amber-300 shadow-xs">
-            <AlertTriangle className="w-2.5 h-2.5 text-slate-950" />
-            <span>{confPercent}%</span>
-          </span>
-        )}
-        {!isEmpty && !isLow && confPercent !== null && (
-          <span className="opacity-0 group-hover/cell:opacity-100 text-[10px] text-champagne-muted transition-opacity">
-            {confPercent}%
-          </span>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
