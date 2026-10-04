@@ -1,8 +1,9 @@
 "use client";
 
 import React from "react";
-import { Sparkles, ScanLine, CheckSquare, AlertTriangle, Layers, RotateCcw, RotateCw } from "lucide-react";
+import { Sparkles, ScanLine, CheckSquare, AlertTriangle, Layers, RotateCcw, RotateCw, AlertCircle } from "lucide-react";
 import { CardItem } from "@/types/extractor";
+import { LOW_CONFIDENCE_THRESHOLD } from "@/services/extractorService";
 
 interface HeroHeaderProps {
   items: CardItem[];
@@ -16,12 +17,24 @@ export default function HeroHeader({ items, onClearAll, onRefresh, isRefreshing 
   const processing = items.filter((i) => i.status === "processing" || i.status === "queued").length;
   const completed = items.filter((i) => i.status === "done").length;
   const reviewed = items.filter((i) => i.isReviewed && i.status === "done").length;
+
+  // Count done rows that have one or more empty fields
+  const rowsWithEmptyFields = items.filter((item) => {
+    if (item.status !== "done" || !item.data) return false;
+    const d = item.data;
+    return !d.company_name || !d.email || !d.phone || !d.website;
+  }).length;
   
-  // Count items with low confidence or unreadable
+  // Count items with low confidence (< 0.8)
   const lowConfidenceCount = items.filter((item) => {
     if (item.status !== "done" || !item.data) return false;
     const c = item.data.confidence;
-    return c.company_name < 0.6 || c.email < 0.6 || c.phone < 0.6 || c.website < 0.6;
+    return (
+      c.company_name < LOW_CONFIDENCE_THRESHOLD ||
+      c.email < LOW_CONFIDENCE_THRESHOLD ||
+      c.phone < LOW_CONFIDENCE_THRESHOLD ||
+      c.website < LOW_CONFIDENCE_THRESHOLD
+    );
   }).length;
 
   return (
@@ -74,10 +87,10 @@ export default function HeroHeader({ items, onClearAll, onRefresh, isRefreshing 
 
         {/* Live Metrics Row */}
         {total > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3.5 mt-6 pt-5 border-t border-border-warm/60">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 mt-6 pt-5 border-t border-border-warm/60">
             <div className="p-3.5 rounded-xl bg-surface/90 border border-border-warm">
               <div className="flex items-center justify-between text-xs text-champagne-muted font-medium">
-                <span>Total Cards</span>
+                <span>Total Rows</span>
                 <Layers className="w-4 h-4 text-champagne-muted/60" />
               </div>
               <p className="text-2xl font-bold text-champagne mt-1">{total}</p>
@@ -85,18 +98,12 @@ export default function HeroHeader({ items, onClearAll, onRefresh, isRefreshing 
 
             <div className="p-3.5 rounded-xl bg-surface/90 border border-border-warm">
               <div className="flex items-center justify-between text-xs text-champagne-muted font-medium">
-                <span>Processing</span>
-                <span className={`w-2 h-2 rounded-full ${processing > 0 ? "bg-warning animate-ping" : "bg-elevated"}`} />
+                <span>With Empty Fields</span>
+                <AlertCircle className={`w-4 h-4 ${rowsWithEmptyFields > 0 ? "text-warning" : "text-champagne-muted/60"}`} />
               </div>
-              <p className="text-2xl font-bold text-warning mt-1">{processing}</p>
-            </div>
-
-            <div className="p-3.5 rounded-xl bg-surface/90 border border-border-warm">
-              <div className="flex items-center justify-between text-xs text-champagne-muted font-medium">
-                <span>Extracted</span>
-                <span className="w-2 h-2 rounded-full bg-success" />
-              </div>
-              <p className="text-2xl font-bold text-success mt-1">{completed}</p>
+              <p className={`text-2xl font-bold mt-1 ${rowsWithEmptyFields > 0 ? "text-warning" : "text-champagne"}`}>
+                {rowsWithEmptyFields}
+              </p>
             </div>
 
             <div className="p-3.5 rounded-xl bg-surface/90 border border-border-warm">
@@ -109,12 +116,20 @@ export default function HeroHeader({ items, onClearAll, onRefresh, isRefreshing 
               </p>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-surface/90 border border-border-warm col-span-2 sm:col-span-1">
+            <div className="p-3.5 rounded-xl bg-surface/90 border border-border-warm">
               <div className="flex items-center justify-between text-xs text-champagne-muted font-medium">
-                <span>Needs Review (&lt;60%)</span>
+                <span>Low Confidence (&lt;80%)</span>
                 <AlertTriangle className="w-4 h-4 text-warning" />
               </div>
               <p className="text-2xl font-bold text-warning mt-1">{lowConfidenceCount}</p>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-surface/90 border border-border-warm">
+              <div className="flex items-center justify-between text-xs text-champagne-muted font-medium">
+                <span>Processing / Queue</span>
+                <span className={`w-2 h-2 rounded-full ${processing > 0 ? "bg-warning animate-ping" : "bg-elevated"}`} />
+              </div>
+              <p className="text-2xl font-bold text-champagne mt-1">{processing}</p>
             </div>
           </div>
         )}

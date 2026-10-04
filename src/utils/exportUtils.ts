@@ -23,9 +23,32 @@ export interface ExportedCardRecord {
 }
 
 /**
+ * Strips null, undefined, "N/A", "null", "undefined", "—", etc. to a truly empty string.
+ */
+export function cleanExportField(val: unknown): string {
+  if (val === null || val === undefined) return "";
+  const str = String(val).trim();
+  const lower = str.toLowerCase();
+  if (
+    lower === "null" ||
+    lower === "undefined" ||
+    lower === "n/a" ||
+    lower === "na" ||
+    lower === "none" ||
+    lower === "—" ||
+    lower === "--" ||
+    lower === "-"
+  ) {
+    return "";
+  }
+  return str;
+}
+
+/**
  * Prepares clean, structured card data for CSV and Excel export.
  * Handles both CardItem[] (from UI state) and raw ExtractedCardData[] (from API responses).
  * Correctly prioritizes actual extracted business fields as the primary columns.
+ * Empty/null fields are guaranteed to be truly empty strings ("").
  */
 export function prepareExportData(
   items: (CardItem | ExtractedCardData | any)[],
@@ -52,39 +75,21 @@ export function prepareExportData(
     // Unnest data object whether nested under item.data or flat on item
     const data: Partial<ExtractedCardData> = item.data ?? item;
 
-    // 1. Company Name
-    const companyName =
-      (typeof data.company_name === "string" ? data.company_name : null) ??
-      (typeof item.company_name === "string" ? item.company_name : null) ??
-      "";
+    // 1. Business Fields (truly empty cells when null/blank)
+    const companyName = cleanExportField(data.company_name ?? item.company_name);
+    const email = cleanExportField(data.email ?? item.email);
+    const phone = cleanExportField(data.phone ?? item.phone);
+    const website = cleanExportField(data.website ?? item.website);
 
-    // 2. Email
-    const email =
-      (typeof data.email === "string" ? data.email : null) ??
-      (typeof item.email === "string" ? item.email : null) ??
-      "";
+    // 2. Source Type
+    const sourceType = cleanExportField(data.source_type ?? item.source_type ?? "card") || "card";
 
-    // 3. Phone
-    const phone =
-      (typeof data.phone === "string" ? data.phone : null) ??
-      (typeof item.phone === "string" ? item.phone : null) ??
-      "";
-
-    // 4. Website
-    const website =
-      (typeof data.website === "string" ? data.website : null) ??
-      (typeof item.website === "string" ? item.website : null) ??
-      "";
-
-    // 5. Source Type
-    const sourceType = String(data.source_type ?? item.source_type ?? "card");
-
-    // 6. Reviewed Status
+    // 3. Reviewed Status
     const isReviewed = Boolean(item.isReviewed ?? (data as any)?.isReviewed ?? false);
 
-    // 7. Confidence Metrics
+    // 4. Confidence Metrics (empty string if unavailable)
     const conf = data.confidence ?? item.confidence;
-    let avgConfidence = "N/A";
+    let avgConfidence = "";
     let confCompany = "";
     let confEmail = "";
     let confPhone = "";
@@ -108,9 +113,9 @@ export function prepareExportData(
       if (typeof conf.website === "number") confWebsite = (conf.website * 100).toFixed(0) + "%";
     }
 
-    // 8. Identifiers & Source File
-    const fileName = String(item.fileName ?? item.file_name ?? "");
-    const imageId = String(data.image_id ?? item.image_id ?? item.id ?? "");
+    // 5. Identifiers & Source File
+    const fileName = cleanExportField(item.fileName ?? item.file_name);
+    const imageId = cleanExportField(data.image_id ?? item.image_id ?? item.id);
 
     return {
       "Company Name": companyName,
@@ -151,8 +156,8 @@ export function generateCSVContent(
   // Data rows
   for (const row of data) {
     const values = headers.map((header) => {
-      const val = row[header] ?? "";
-      return `"${String(val).replace(/"/g, '""')}"`;
+      const val = cleanExportField(row[header]);
+      return val ? `"${val.replace(/"/g, '""')}"` : "";
     });
     csvRows.push(values.join(","));
   }

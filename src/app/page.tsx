@@ -9,12 +9,13 @@ import ProcessingTracker from "@/components/ProcessingTracker";
 import ReviewTable from "@/components/ReviewTable";
 import ExportBar from "@/components/ExportBar";
 import { ToastProvider, useToast } from "@/components/Toast";
-import { BackendRecord, CardItem, ExtractedCardData, SourceType } from "@/types/extractor";
+import { BackendRecord, CardItem, ExtractedCardData, FieldConfidence, SourceType } from "@/types/extractor";
 import {
   extractCardData,
   generateUUID,
   getRecords,
   patchRecord,
+  PatchRecordFields,
 } from "@/services/extractorService";
 
 function mergeBackendRecords(prevItems: CardItem[], records: BackendRecord[]): CardItem[] {
@@ -102,12 +103,7 @@ function ExpoCardExtractorApp() {
       string,
       {
         inFlight: boolean;
-        queuedFields: {
-          company_name?: string | null;
-          email?: string | null;
-          phone?: string | null;
-          website?: string | null;
-        } | null;
+        queuedFields: PatchRecordFields | null;
       }
     >
   >(new Map());
@@ -313,15 +309,7 @@ function ExpoCardExtractorApp() {
 
   // Dispatch PATCH /records/{id} for inline edits with per-row in-flight queue (latest edit wins)
   const dispatchPatch = useCallback(
-    async (
-      rowId: string,
-      newFields: {
-        company_name?: string | null;
-        email?: string | null;
-        phone?: string | null;
-        website?: string | null;
-      }
-    ) => {
+    async (rowId: string, newFields: PatchRecordFields) => {
       const currentItem = itemsRef.current.find((i) => i.id === rowId);
       if (!currentItem || currentItem.status !== "done" || !currentItem.data?.image_id) {
         return;
@@ -336,6 +324,7 @@ function ExpoCardExtractorApp() {
           queuedFields: {
             ...(queueEntry.queuedFields || {}),
             ...newFields,
+            confidence: newFields.confidence || queueEntry.queuedFields?.confidence,
           },
         });
         return;
@@ -399,9 +388,49 @@ function ExpoCardExtractorApp() {
         return;
       }
 
-      const trimmedVal = value || null;
+      const trimmedVal = value.trim();
 
-      // 1. Optimistic UI update: keep edit visible, set confidence to 1.0 (local only)
+      // HOLD Requirement 4(a): Clearing a field to null is NOT sent to backend.
+      // Show empty/needs-input locally, do NOT send PATCH, mark row "unsaved: clearing not supported yet". Never send "".
+      if (!trimmedVal) {
+        setItems((prev) =>
+          prev.map((item) => {
+            if (item.id !== id || !item.data) return item;
+            return {
+              ...item,
+              saveStatus: "failed",
+              saveError: "unsaved: clearing not supported yet",
+              data: {
+                ...item.data,
+                [field]: null,
+                confidence: {
+                  ...item.data.confidence,
+                  [field]: 0.0,
+                },
+              },
+            };
+          })
+        );
+        return;
+      }
+
+      // Requirement 3: Non-empty edit.
+      // Send confidence as FULL 4-key object (1.0 for edited field, current values for others).
+      const currentConf = currentItem.data.confidence || {
+        company_name: 0.0,
+        email: 0.0,
+        phone: 0.0,
+        website: 0.0,
+      };
+
+      const updatedConfidence: FieldConfidence = {
+        company_name: field === "company_name" ? 1.0 : (currentConf.company_name ?? 0.0),
+        email: field === "email" ? 1.0 : (currentConf.email ?? 0.0),
+        phone: field === "phone" ? 1.0 : (currentConf.phone ?? 0.0),
+        website: field === "website" ? 1.0 : (currentConf.website ?? 0.0),
+      };
+
+      // 1. Optimistic UI update: keep edit visible, update confidence
       setItems((prev) =>
         prev.map((item) => {
           if (item.id !== id || !item.data) return item;
@@ -412,17 +441,17 @@ function ExpoCardExtractorApp() {
             data: {
               ...item.data,
               [field]: trimmedVal,
-              confidence: {
-                ...item.data.confidence,
-                [field]: 1.0,
-              },
+              confidence: updatedConfidence,
             },
           };
         })
       );
 
-      // 2. Dispatch PATCH for this field
-      dispatchPatch(id, { [field]: trimmedVal });
+      // 2. Dispatch PATCH for this field with full 4-key confidence
+      dispatchPatch(id, {
+        [field]: trimmedVal,
+        confidence: updatedConfidence,
+      });
     },
     [dispatchPatch]
   );
@@ -439,12 +468,16 @@ function ExpoCardExtractorApp() {
         title: "Retrying Save",
         description: `Re-sending edits for "${currentItem.fileName}" to backend...`,
       });
-      dispatchPatch(id, {
-        company_name: currentItem.data.company_name,
-        email: currentItem.data.email,
-        phone: currentItem.data.phone,
-        website: currentItem.data.website,
-      });
+
+      const patchData: PatchRecordFields = {
+        confidence: currentItem.data.confidence,
+      };
+      if (currentItem.data.company_name) patchData.company_name = currentItem.data.company_name;
+      if (currentItem.data.email) patchData.email = currentItem.data.email;
+      if (currentItem.data.phone) patchData.phone = currentItem.data.phone;
+      if (currentItem.data.website) patchData.website = currentItem.data.website;
+
+      dispatchPatch(id, patchData);
     },
     [dispatchPatch, showToast]
   );
