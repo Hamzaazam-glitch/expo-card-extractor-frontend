@@ -418,7 +418,15 @@ function ExpoCardExtractorApp() {
           }
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Failed to persist edits to backend";
-          patchQueuesRef.current.set(rowId, { inFlight: false, queuedFields: null });
+          // F4 STATE-02: keep queued edits when a PATCH fails so Retry re-sends them
+          const pending = patchQueuesRef.current.get(rowId)?.queuedFields;
+          patchQueuesRef.current.set(rowId, {
+            inFlight: false,
+            queuedFields: {
+              ...fieldsToSend,
+              ...(pending || {}),
+            },
+          });
           setItems((prev) =>
             prev.map((item) =>
               item.id === rowId ? { ...item, saveStatus: "failed", saveError: msg } : item
@@ -489,29 +497,50 @@ function ExpoCardExtractorApp() {
     [dispatchPatch]
   );
 
-  // Retry saving a failed row edit or review status
+  // Retry saving a failed row edit (sends queued fields only with freshly rebuilt confidence)
   const handleRetrySave = useCallback(
     (id: string) => {
       const currentItem = itemsRef.current.find((i) => i.id === id);
       if (!currentItem || currentItem.status !== "done" || !currentItem.data?.image_id) {
         return;
       }
+
+      const queueEntry = patchQueuesRef.current.get(id);
+      const queued = queueEntry?.queuedFields;
+      if (!queued || Object.keys(queued).length === 0) {
+        return;
+      }
+
       showToast({
         type: "info",
         title: "Retrying Save",
         description: `Re-sending edits for "${currentItem.fileName}" to backend...`,
       });
 
-      const patchData: PatchRecordFields = {
-        confidence: currentItem.data.confidence,
-        reviewed: currentItem.isReviewed,
+      // Always rebuild 4-key confidence from CURRENT item state (never from a stale queued copy)
+      const currentConf = currentItem.data.confidence || {
+        company_name: 0.0,
+        email: 0.0,
+        phone: 0.0,
+        website: 0.0,
       };
-      if (currentItem.data.company_name !== undefined) patchData.company_name = currentItem.data.company_name;
-      if (currentItem.data.email !== undefined) patchData.email = currentItem.data.email;
-      if (currentItem.data.phone !== undefined) patchData.phone = currentItem.data.phone;
-      if (currentItem.data.website !== undefined) patchData.website = currentItem.data.website;
+      const rebuiltConfidence: FieldConfidence = {
+        company_name: currentConf.company_name ?? 0.0,
+        email: currentConf.email ?? 0.0,
+        phone: currentConf.phone ?? 0.0,
+        website: currentConf.website ?? 0.0,
+      };
 
-      dispatchPatch(id, patchData);
+      // Resend queued fields only (no guessing "edited fields") + rebuilt confidence
+      const fieldsToResend: PatchRecordFields = {
+        confidence: rebuiltConfidence,
+      };
+      if ("company_name" in queued) fieldsToResend.company_name = queued.company_name;
+      if ("email" in queued) fieldsToResend.email = queued.email;
+      if ("phone" in queued) fieldsToResend.phone = queued.phone;
+      if ("website" in queued) fieldsToResend.website = queued.website;
+
+      dispatchPatch(id, fieldsToResend);
     },
     [dispatchPatch, showToast]
   );
@@ -530,9 +559,9 @@ function ExpoCardExtractorApp() {
     );
   }, []);
 
-  // Toggle reviewed status via PATCH { reviewed: true | false } only
+  // Toggle reviewed status via PATCH { reviewed: true | false } only (independent of field queue)
   const handleToggleReviewed = useCallback(
-    (id: string) => {
+    async (id: string) => {
       const currentItem = itemsRef.current.find((i) => i.id === id);
       if (!currentItem || currentItem.status !== "done") {
         return;
@@ -540,7 +569,7 @@ function ExpoCardExtractorApp() {
 
       const nextReviewed = !currentItem.isReviewed;
 
-      // 1. Optimistic UI update with saving pill (does not block ticking while fields are empty)
+      // 1. Optimistic UI update with saving pill
       setItems((prev) =>
         prev.map((item) =>
           item.id === id
@@ -554,9 +583,36 @@ function ExpoCardExtractorApp() {
         )
       );
 
-      // 2. Dispatch PATCH { reviewed: nextReviewed } if item has image_id
-      if (currentItem.data?.image_id) {
-        dispatchPatch(id, { reviewed: nextReviewed });
+      // 2. Dispatch independent PATCH { reviewed: nextReviewed } if item has image_id
+      const imageId = currentItem.data?.image_id;
+      if (imageId) {
+        try {
+          await patchRecord(imageId, { reviewed: nextReviewed });
+          setItems((prev) =>
+            prev.map((item) =>
+              item.id === id ? { ...item, saveStatus: "saved", saveError: undefined } : item
+            )
+          );
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Failed to update review status";
+          setItems((prev) =>
+            prev.map((item) =>
+              item.id === id
+                ? {
+                    ...item,
+                    isReviewed: !nextReviewed, // revert optimistic state on failure
+                    saveStatus: "failed",
+                    saveError: msg,
+                  }
+                : item
+            )
+          );
+          showToast({
+            type: "error",
+            title: "Review Update Failed",
+            description: msg,
+          });
+        }
       } else {
         setItems((prev) =>
           prev.map((item) =>
@@ -565,7 +621,7 @@ function ExpoCardExtractorApp() {
         );
       }
     },
-    [dispatchPatch]
+    [showToast]
   );
 
   // Delete row
