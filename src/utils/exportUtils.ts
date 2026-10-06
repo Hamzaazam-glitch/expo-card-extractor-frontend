@@ -17,6 +17,31 @@ export interface ExportedCardRecord {
   "Image ID": string;
 }
 
+interface ReviewableLike {
+  isReviewed?: boolean;
+  reviewed?: boolean;
+  data?: {
+    isReviewed?: boolean;
+    reviewed?: boolean;
+  } | null;
+}
+
+/**
+ * Checks whether an item or record has been marked as reviewed.
+ * Supports CardItem (isReviewed), BackendRecord (reviewed), and nested data equivalents.
+ */
+export function isItemReviewed(item: unknown): boolean {
+  if (!item || typeof item !== "object") return false;
+  const candidate = item as ReviewableLike;
+  return Boolean(
+    candidate.isReviewed ??
+    candidate.reviewed ??
+    candidate.data?.isReviewed ??
+    candidate.data?.reviewed ??
+    false
+  );
+}
+
 /**
  * Strips null, undefined, "N/A", "null", "undefined", "—", etc. to a truly empty string.
  */
@@ -60,8 +85,7 @@ export function prepareExportData(
       return false;
     }
     if (options.onlyReviewed) {
-      const isReviewed = Boolean(item.isReviewed ?? item.data?.isReviewed ?? false);
-      if (!isReviewed) return false;
+      if (!isItemReviewed(item)) return false;
     }
     return true;
   });
@@ -80,7 +104,7 @@ export function prepareExportData(
     const sourceType = cleanExportField(data.source_type ?? item.source_type ?? "card") || "card";
 
     // 3. Reviewed Status
-    const isReviewed = Boolean(item.isReviewed ?? item.reviewed ?? (data as any)?.isReviewed ?? (data as any)?.reviewed ?? false);
+    const isReviewed = isItemReviewed(item);
 
 
     // 5. Identifiers & Source File (uses 8-char short ID if fileName not stored)
