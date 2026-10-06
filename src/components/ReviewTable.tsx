@@ -100,13 +100,8 @@ export default function ReviewTable({
     setEditingCell(null);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent, id: string, field: string) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      commitEdit(id, field);
-    } else if (e.key === "Escape") {
-      setEditingCell(null);
-    }
+  const cancelEdit = () => {
+    setEditingCell(null);
   };
 
   if (items.length === 0) {
@@ -385,7 +380,7 @@ export default function ReviewTable({
                                 onStartEdit={(val) => startEditing(item.id, "company_name", val)}
                                 onChangeTempValue={setTempValue}
                                 onCommit={() => commitEdit(item.id, "company_name")}
-                                onKeyDown={(e) => handleKeyDown(e, item.id, "company_name")}
+                                onCancel={cancelEdit}
                               />
                             </td>
 
@@ -402,7 +397,7 @@ export default function ReviewTable({
                                 onStartEdit={(val) => startEditing(item.id, "email", val)}
                                 onChangeTempValue={setTempValue}
                                 onCommit={() => commitEdit(item.id, "email")}
-                                onKeyDown={(e) => handleKeyDown(e, item.id, "email")}
+                                onCancel={cancelEdit}
                               />
                             </td>
 
@@ -419,7 +414,7 @@ export default function ReviewTable({
                                 onStartEdit={(val) => startEditing(item.id, "phone", val)}
                                 onChangeTempValue={setTempValue}
                                 onCommit={() => commitEdit(item.id, "phone")}
-                                onKeyDown={(e) => handleKeyDown(e, item.id, "phone")}
+                                onCancel={cancelEdit}
                               />
                             </td>
 
@@ -436,7 +431,7 @@ export default function ReviewTable({
                                 onStartEdit={(val) => startEditing(item.id, "website", val)}
                                 onChangeTempValue={setTempValue}
                                 onCommit={() => commitEdit(item.id, "website")}
-                                onKeyDown={(e) => handleKeyDown(e, item.id, "website")}
+                                onCancel={cancelEdit}
                               />
                             </td>
                           </>
@@ -535,7 +530,7 @@ interface EditableCellProps {
   onStartEdit: (val: string | null) => void;
   onChangeTempValue: (val: string) => void;
   onCommit: () => void;
-  onKeyDown: (e: React.KeyboardEvent) => void;
+  onCancel?: () => void;
 }
 
 function EditableCell({
@@ -547,9 +542,37 @@ function EditableCell({
   onStartEdit,
   onChangeTempValue,
   onCommit,
-  onKeyDown,
+  onCancel,
 }: EditableCellProps) {
   const isEmpty = !value || value.trim() === "";
+  const isCommittedOrCancelledRef = React.useRef(false);
+
+  React.useEffect(() => {
+    if (isEditing) {
+      isCommittedOrCancelledRef.current = false;
+    }
+  }, [isEditing]);
+
+  const handleBlur = () => {
+    if (!isCommittedOrCancelledRef.current) {
+      isCommittedOrCancelledRef.current = true;
+      onCommit();
+    }
+  };
+
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (!isCommittedOrCancelledRef.current) {
+        isCommittedOrCancelledRef.current = true;
+        onCommit();
+      }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      isCommittedOrCancelledRef.current = true;
+      onCancel?.();
+    }
+  };
 
   if (isEditing) {
     return (
@@ -558,8 +581,8 @@ function EditableCell({
           type="text"
           value={tempValue}
           onChange={(e) => onChangeTempValue(e.target.value)}
-          onBlur={onCommit}
-          onKeyDown={onKeyDown}
+          onBlur={handleBlur}
+          onKeyDown={handleInputKeyDown}
           autoFocus
           className="w-full px-2.5 py-1 text-xs rounded-md bg-elevated border-2 border-brass text-champagne focus:outline-none shadow-sm"
           placeholder={placeholder}
