@@ -200,7 +200,7 @@ function ExpoCardExtractorApp() {
   }, [showToast]);
 
   // Process a single card (called sequentially or with concurrency)
-  const processCard = useCallback(async (itemId: string, shouldSimulateFail = false) => {
+  const processCard = useCallback(async (itemId: string) => {
     // Set status to processing
     setItems((prev) =>
       prev.map((item) =>
@@ -221,7 +221,7 @@ function ExpoCardExtractorApp() {
       };
 
       const selectedSourceType = currentItem.sourceType || "card";
-      const res = await extractCardData(input, selectedSourceType, shouldSimulateFail);
+      const res = await extractCardData(input, selectedSourceType);
 
       // Set status to done with data
       setItems((prev) =>
@@ -263,7 +263,7 @@ function ExpoCardExtractorApp() {
 
     // Process queued cards sequentially so local OCR CPU load remains smooth
     for (const item of queuedItems) {
-      await processCard(item.id, false);
+      await processCard(item.id);
     }
 
     setIsExtractingAll(false);
@@ -282,7 +282,7 @@ function ExpoCardExtractorApp() {
         title: "Retrying Extraction",
         description: "Re-submitting image to OCR pipeline...",
       });
-      await processCard(id, false);
+      await processCard(id);
       showToast({
         type: "success",
         title: "Retry Succeeded",
@@ -304,7 +304,7 @@ function ExpoCardExtractorApp() {
     });
 
     for (const item of failedItems) {
-      await processCard(item.id, false);
+      await processCard(item.id);
     }
   }, [items, processCard, showToast]);
 

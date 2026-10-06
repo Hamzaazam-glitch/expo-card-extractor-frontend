@@ -50,13 +50,8 @@ export function generateUUID(): string {
  */
 export async function extractCardData(
   fileOrInput: File | Blob | { name: string; file?: File; previewUrl?: string },
-  requestedSourceType: SourceType = "card",
-  shouldSimulateFailure = false
+  requestedSourceType: SourceType = "card"
 ): Promise<ExtractedCardData> {
-  if (shouldSimulateFailure) {
-    throw new Error("FastAPI OCR Engine simulated timeout: failed to process image stream. Please retry.");
-  }
-
   // Step 0: Ensure we have a valid File object for multipart upload
   const file = await resolveToFile(fileOrInput);
 
