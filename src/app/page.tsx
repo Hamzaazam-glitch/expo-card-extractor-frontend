@@ -92,12 +92,31 @@ function mergeBackendRecords(prevItems: CardItem[], records: BackendRecord[]): C
   return [...unpersistedSessionItems, ...mergedBackendItems];
 }
 
+function revokeIfBlob(url?: string | null) {
+  if (url && typeof url === "string" && url.startsWith("blob:")) {
+    try {
+      URL.revokeObjectURL(url);
+    } catch {
+      // Ignore if already revoked or invalid
+    }
+  }
+}
+
 function ExpoCardExtractorApp() {
   const [items, setItems] = useState<CardItem[]>([]);
   const itemsRef = React.useRef<CardItem[]>(items);
   React.useEffect(() => {
     itemsRef.current = items;
   }, [items]);
+
+  // Revoke all active blob URLs on unmount to prevent browser memory leaks
+  React.useEffect(() => {
+    return () => {
+      for (const item of itemsRef.current) {
+        revokeIfBlob(item.previewUrl);
+      }
+    };
+  }, []);
 
   const patchQueuesRef = React.useRef<
     Map<
@@ -131,7 +150,7 @@ function ExpoCardExtractorApp() {
         });
       });
 
-    return () => {
+  return () => {
       active = false;
     };
   }, [showToast]);
@@ -186,11 +205,18 @@ function ExpoCardExtractorApp() {
 
   // Remove item
   const handleRemoveItem = useCallback((id: string) => {
+    const item = itemsRef.current.find((i) => i.id === id);
+    if (item?.previewUrl) {
+      revokeIfBlob(item.previewUrl);
+    }
     setItems((prev) => prev.filter((item) => item.id !== id));
   }, []);
 
   // Clear all items
   const handleClearAll = useCallback(() => {
+    for (const item of itemsRef.current) {
+      revokeIfBlob(item.previewUrl);
+    }
     setItems([]);
     showToast({
       type: "info",
@@ -518,6 +544,10 @@ function ExpoCardExtractorApp() {
   // Delete row
   const handleDeleteRow = useCallback(
     (id: string) => {
+      const item = itemsRef.current.find((i) => i.id === id);
+      if (item?.previewUrl) {
+        revokeIfBlob(item.previewUrl);
+      }
       setItems((prev) => prev.filter((item) => item.id !== id));
       showToast({
         type: "info",
