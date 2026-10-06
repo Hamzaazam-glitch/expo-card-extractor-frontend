@@ -44,18 +44,13 @@ export function generateUUID(): string {
 }
 
 /**
- * Service function to extract card data from an image by chaining
- * POST /upload (multipart/form-data) -> POST /extract (application/json)
- * using the real FastAPI backend.
+ * Uploads an image file to POST /upload and returns the resulting image_id.
  */
-export async function extractCardData(
-  fileOrInput: File | Blob | { name: string; file?: File; previewUrl?: string },
-  requestedSourceType: SourceType = "card"
-): Promise<ExtractedCardData> {
-  // Step 0: Ensure we have a valid File object for multipart upload
+export async function uploadCardImage(
+  fileOrInput: File | Blob | { name: string; file?: File; previewUrl?: string }
+): Promise<string> {
   const file = await resolveToFile(fileOrInput);
 
-  // Step 1: Upload the file (POST {BASE_URL}/upload)
   let uploadRes: Response;
   try {
     const formData = new FormData();
@@ -94,7 +89,16 @@ export async function extractCardData(
     throw new Error("Backend upload response did not include 'image_id'");
   }
 
-  // Step 2: Extract data using image_id and selected source_type (POST {BASE_URL}/extract)
+  return imageId;
+}
+
+/**
+ * Triggers OCR extraction on an already uploaded image by image_id (POST /extract).
+ */
+export async function extractFromImageId(
+  imageId: string,
+  requestedSourceType: SourceType = "card"
+): Promise<ExtractedCardData> {
   let extractRes: Response;
   try {
     extractRes = await fetch(`${API_BASE_URL}/extract`, {
@@ -132,7 +136,6 @@ export async function extractCardData(
 
   const extractData = await extractRes.json();
 
-  // Step 3: Normalize and format to exact ExtractedCardData shape
   const rawConfidence = extractData?.confidence || {};
   const confidence: FieldConfidence = {
     company_name:
@@ -168,6 +171,18 @@ export async function extractCardData(
     confidence,
     source_type: normalizedSourceType,
   };
+}
+
+/**
+ * Service function to extract card data from an image by chaining
+ * POST /upload (multipart/form-data) -> POST /extract (application/json)
+ */
+export async function extractCardData(
+  fileOrInput: File | Blob | { name: string; file?: File; previewUrl?: string },
+  requestedSourceType: SourceType = "card"
+): Promise<ExtractedCardData> {
+  const imageId = await uploadCardImage(fileOrInput);
+  return extractFromImageId(imageId, requestedSourceType);
 }
 
 /**

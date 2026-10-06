@@ -11,11 +11,12 @@ import ExportBar from "@/components/ExportBar";
 import { ToastProvider, useToast } from "@/components/Toast";
 import { BackendRecord, CardItem, ExtractedCardData, FieldConfidence, SourceType } from "@/types/extractor";
 import {
-  extractCardData,
+  extractFromImageId,
   generateUUID,
   getRecords,
   patchRecord,
   PatchRecordFields,
+  uploadCardImage,
 } from "@/services/extractorService";
 
 function mergeBackendRecords(prevItems: CardItem[], records: BackendRecord[]): CardItem[] {
@@ -242,20 +243,37 @@ function ExpoCardExtractorApp() {
       const currentItem = itemsRef.current.find((i) => i.id === itemId);
       if (!currentItem) return;
 
-      const input = currentItem.file || {
-        name: currentItem.fileName,
-        previewUrl: currentItem.previewUrl,
-      };
-
       const selectedSourceType = currentItem.sourceType || "card";
-      const res = await extractCardData(input, selectedSourceType);
+      let imageId = currentItem.imageId || currentItem.data?.image_id;
 
-      // Set status to done with data
+      if (!imageId) {
+        // Step 1: Upload image file
+        const input = currentItem.file || {
+          name: currentItem.fileName,
+          previewUrl: currentItem.previewUrl,
+        };
+        imageId = await uploadCardImage(input);
+
+        // F2 amendment: set imageId on the item immediately after /upload resolves
+        setItems((prev) =>
+          prev.map((item) =>
+            item.id === itemId
+              ? { ...item, imageId }
+              : item
+          )
+        );
+      }
+
+      // Step 2: Extract data using imageId (only calls POST /extract)
+      const res = await extractFromImageId(imageId, selectedSourceType);
+
+      // Set status to done with data and preserve imageId
       setItems((prev) =>
         prev.map((item) =>
           item.id === itemId
             ? {
                 ...item,
+                imageId: res.image_id || imageId,
                 status: "done",
                 data: res,
                 sourceType: res.source_type || selectedSourceType,
@@ -267,6 +285,7 @@ function ExpoCardExtractorApp() {
       );
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "OCR Processing failed";
+      // If /upload succeeded but /extract failed, imageId is already retained on the item
       setItems((prev) =>
         prev.map((item) =>
           item.id === itemId

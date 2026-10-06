@@ -38,6 +38,7 @@ export interface BackendRecord {
 
 export interface CardItem {
   id: string;
+  imageId?: string;
   fileName: string;
   fileSize: number;
   fileType: string;
