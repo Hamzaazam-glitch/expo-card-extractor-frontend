@@ -7,9 +7,10 @@ import { CardItem } from "@/types/extractor";
 interface ProcessingTrackerProps {
   items: CardItem[];
   onRetryFailed: (id?: string) => void;
+  isRetrying?: boolean;
 }
 
-export default function ProcessingTracker({ items, onRetryFailed }: ProcessingTrackerProps) {
+export default function ProcessingTracker({ items, onRetryFailed, isRetrying }: ProcessingTrackerProps) {
   const queued = items.filter((i) => i.status === "queued").length;
   const processing = items.filter((i) => i.status === "processing").length;
   const done = items.filter((i) => i.status === "done").length;
@@ -79,11 +80,16 @@ export default function ProcessingTracker({ items, onRetryFailed }: ProcessingTr
           {failed.length > 0 && (
             <button
               onClick={() => onRetryFailed()}
-              className="px-2.5 py-1 rounded-md bg-error/20 hover:bg-error/30 text-rose-300 border border-error/40 flex items-center gap-1.5 transition-colors cursor-pointer"
+              disabled={isRetrying}
+              className={`px-2.5 py-1 rounded-md border flex items-center gap-1.5 transition-colors ${
+                isRetrying
+                  ? "bg-error/10 text-rose-300/60 border-error/20 cursor-not-allowed"
+                  : "bg-error/20 hover:bg-error/30 text-rose-300 border border-error/40 cursor-pointer"
+              }`}
               title="Retry all failed cards"
             >
-              <RotateCw className="w-3 h-3" />
-              <span>Retry {failed.length} Failed</span>
+              <RotateCw className={`w-3 h-3 ${isRetrying ? "animate-spin" : ""}`} />
+              <span>{isRetrying ? "Retrying..." : `Retry ${failed.length} Failed`}</span>
             </button>
           )}
         </div>

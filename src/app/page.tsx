@@ -129,6 +129,7 @@ function ExpoCardExtractorApp() {
   >(new Map());
 
   const [isExtractingAll, setIsExtractingAll] = useState(false);
+  const [isRetryingFailed, setIsRetryingFailed] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { showToast } = useToast();
 
@@ -320,19 +321,25 @@ function ExpoCardExtractorApp() {
 
   // Retry all failed cards
   const handleRetryFailed = useCallback(async () => {
-    const failedItems = items.filter((i) => i.status === "failed");
+    if (isRetryingFailed) return;
+    const failedItems = itemsRef.current.filter((i) => i.status === "failed");
     if (failedItems.length === 0) return;
 
-    showToast({
-      type: "info",
-      title: "Retrying Failed Cards",
-      description: `Re-processing ${failedItems.length} failed card${failedItems.length > 1 ? "s" : ""}...`,
-    });
+    setIsRetryingFailed(true);
+    try {
+      showToast({
+        type: "info",
+        title: "Retrying Failed Cards",
+        description: `Re-processing ${failedItems.length} failed card${failedItems.length > 1 ? "s" : ""}...`,
+      });
 
-    for (const item of failedItems) {
-      await processCard(item.id);
+      for (const item of failedItems) {
+        await processCard(item.id);
+      }
+    } finally {
+      setIsRetryingFailed(false);
     }
-  }, [items, processCard, showToast]);
+  }, [isRetryingFailed, processCard, showToast]);
 
   // Dispatch PATCH /records/{id} for inline edits with per-row in-flight queue (latest edit wins)
   const dispatchPatch = useCallback(
@@ -601,7 +608,11 @@ function ExpoCardExtractorApp() {
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.25 }}
             >
-              <ProcessingTracker items={items} onRetryFailed={handleRetryFailed} />
+              <ProcessingTracker
+                items={items}
+                onRetryFailed={handleRetryFailed}
+                isRetrying={isRetryingFailed}
+              />
             </motion.section>
           )}
         </AnimatePresence>
