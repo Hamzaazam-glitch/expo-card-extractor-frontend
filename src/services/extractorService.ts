@@ -4,6 +4,65 @@ export const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
 ).replace(/\/+$/, "");
 
+export const TIMEOUT_UPLOAD_MS = 60_000;
+export const TIMEOUT_DEFAULT_MS = 30_000;
+export const TIMEOUT_EXTRACT_MS = 180_000;
+
+interface FetchTimeoutOptions extends RequestInit {
+  timeoutMs?: number;
+  timeoutMessage?: string;
+  endpointName?: string;
+}
+
+async function fetchWithTimeout(
+  url: string,
+  options: FetchTimeoutOptions = {}
+): Promise<Response> {
+  const {
+    timeoutMs = TIMEOUT_DEFAULT_MS,
+    timeoutMessage,
+    endpointName = "Request",
+    ...fetchInit
+  } = options;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      ...fetchInit,
+      signal: controller.signal,
+    });
+    return res;
+  } catch (err: unknown) {
+    if (
+      controller.signal.aborted ||
+      (err instanceof DOMException && err.name === "AbortError") ||
+      (err as { name?: string })?.name === "AbortError"
+    ) {
+      throw new Error(
+        timeoutMessage ||
+          `${endpointName} timed out after ${timeoutMs / 1000}s.`
+      );
+    }
+    const msg = err instanceof Error ? err.message : String(err);
+    if (
+      msg.includes("Failed to fetch") ||
+      msg.includes("NetworkError") ||
+      msg.includes("Load failed")
+    ) {
+      throw new Error(
+        `Backend connection failed (${API_BASE_URL}). Please verify FastAPI is running and CORS allows origin.`
+      );
+    }
+    throw new Error(`${endpointName} network error: ${msg}`);
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 /**
  * Resolves file input to a genuine File instance with a backend-compatible extension (.jpg, .jpeg, .png).
  */
@@ -51,24 +110,16 @@ export async function uploadCardImage(
 ): Promise<string> {
   const file = await resolveToFile(fileOrInput);
 
-  let uploadRes: Response;
-  try {
-    const formData = new FormData();
-    formData.append("file", file);
+  const formData = new FormData();
+  formData.append("file", file);
 
-    uploadRes = await fetch(`${API_BASE_URL}/upload`, {
-      method: "POST",
-      body: formData,
-    });
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("Load failed")) {
-      throw new Error(
-        `Backend connection failed (${API_BASE_URL}). Please verify FastAPI is running and CORS allows origin.`
-      );
-    }
-    throw new Error(`Upload network error: ${msg}`);
-  }
+  const uploadRes = await fetchWithTimeout(`${API_BASE_URL}/upload`, {
+    method: "POST",
+    body: formData,
+    timeoutMs: TIMEOUT_UPLOAD_MS,
+    timeoutMessage: "Upload timed out after 60s. Please check your network connection.",
+    endpointName: "Upload",
+  });
 
   if (!uploadRes.ok) {
     let errorDetail = `HTTP ${uploadRes.status} ${uploadRes.statusText}`;
@@ -99,27 +150,20 @@ export async function extractFromImageId(
   imageId: string,
   requestedSourceType: SourceType = "card"
 ): Promise<ExtractedCardData> {
-  let extractRes: Response;
-  try {
-    extractRes = await fetch(`${API_BASE_URL}/extract`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        image_id: imageId,
-        source_type: requestedSourceType,
-      }),
-    });
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("Load failed")) {
-      throw new Error(
-        `Extraction request failed (${API_BASE_URL}/extract). Please check network and backend CORS.`
-      );
-    }
-    throw new Error(`Extraction network error: ${msg}`);
-  }
+  const extractRes = await fetchWithTimeout(`${API_BASE_URL}/extract`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      image_id: imageId,
+      source_type: requestedSourceType,
+    }),
+    timeoutMs: TIMEOUT_EXTRACT_MS,
+    timeoutMessage:
+      "Extraction timed out after 180s. The server may still be processing this image; please wait a moment before retrying.",
+    endpointName: "Extraction",
+  });
 
   if (!extractRes.ok) {
     let errorDetail = `HTTP ${extractRes.status} ${extractRes.statusText}`;
@@ -218,19 +262,16 @@ export async function patchRecord(
   id: string,
   fields: PatchRecordFields
 ): Promise<void> {
-  let res: Response;
-  try {
-    res = await fetch(`${API_BASE_URL}/records/${encodeURIComponent(id)}`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(fields),
-    });
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(`PATCH /records/${id} network error: ${msg}`);
-  }
+  const res = await fetchWithTimeout(`${API_BASE_URL}/records/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(fields),
+    timeoutMs: TIMEOUT_DEFAULT_MS,
+    timeoutMessage: "Save request timed out after 30s. Please retry saving your edits.",
+    endpointName: `PATCH /records/${id}`,
+  });
 
   if (!res.ok) {
     throw new Error(`PATCH /records/${id} failed with HTTP ${res.status}`);
@@ -249,18 +290,15 @@ export async function getRecords(options?: { reviewed?: boolean }): Promise<Back
   if (options?.reviewed !== undefined) {
     url += `?reviewed=${options.reviewed}`;
   }
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-      },
-    });
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(`Failed to connect to backend GET /records: ${msg}`);
-  }
+  const res = await fetchWithTimeout(url, {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+    },
+    timeoutMs: TIMEOUT_DEFAULT_MS,
+    timeoutMessage: "Loading saved records timed out after 30s.",
+    endpointName: "GET /records",
+  });
 
   if (!res.ok) {
     let errorDetail = `HTTP ${res.status}`;
