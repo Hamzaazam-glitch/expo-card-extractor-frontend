@@ -20,10 +20,10 @@ import {
 } from "@/services/extractorService";
 
 function mergeBackendRecords(prevItems: CardItem[], records: BackendRecord[]): CardItem[] {
-  // Map current items by image_id
+  // Map current items by image_id (support both item.imageId set during upload and item.data.image_id)
   const existingByImageId = new Map<string, CardItem>();
   for (const item of prevItems) {
-    const imgId = item.data?.image_id;
+    const imgId = item.imageId || item.data?.image_id;
     if (imgId) {
       existingByImageId.set(imgId, item);
     }
@@ -55,6 +55,7 @@ function mergeBackendRecords(prevItems: CardItem[], records: BackendRecord[]): C
 
     return {
       id: existing ? existing.id : generateUUID(),
+      imageId: record.image_id,
       fileName: existing
         ? existing.fileName
         : record.image_id
@@ -86,7 +87,7 @@ function mergeBackendRecords(prevItems: CardItem[], records: BackendRecord[]): C
 
   // Also keep any active items in current session not yet in backend (e.g. queued or failed before upload)
   const unpersistedSessionItems = prevItems.filter((i) => {
-    const imgId = i.data?.image_id;
+    const imgId = i.imageId || i.data?.image_id;
     return !imgId || !incomingImageIds.has(imgId);
   });
 
