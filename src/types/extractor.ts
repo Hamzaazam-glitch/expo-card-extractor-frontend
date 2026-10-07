@@ -51,6 +51,7 @@ export interface CardItem {
   errorMessage?: string;
   data: ExtractedCardData | null;
   isReviewed: boolean;
+  isEdited?: boolean;
   createdAt: number;
   isUnreadable?: boolean;
   sourceType?: SourceType;

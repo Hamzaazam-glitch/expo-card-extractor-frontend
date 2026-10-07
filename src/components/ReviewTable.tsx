@@ -253,10 +253,11 @@ export default function ReviewTable({
                               </div>
                               <button
                                 onClick={() => onRetryRow(item.id)}
-                                className="self-start sm:self-auto inline-flex items-center gap-1 px-2.5 py-1 rounded bg-warning hover:bg-amber-400 text-slate-950 font-bold text-xs transition-colors cursor-pointer"
+                                disabled={item.status === "processing"}
+                                className="self-start sm:self-auto inline-flex items-center gap-1 px-2.5 py-1 rounded bg-warning hover:bg-amber-400 text-slate-950 font-bold text-xs transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                               >
-                                <RotateCw className="w-3 h-3" />
-                                <span>Retry OCR</span>
+                                <RotateCw className={`w-3 h-3 ${item.status === "processing" ? "animate-spin" : ""}`} />
+                                <span>{item.status === "processing" ? "Retrying..." : "Retry OCR"}</span>
                               </button>
                             </div>
                           </td>
@@ -357,10 +358,11 @@ export default function ReviewTable({
                                 </select>
                                 <button
                                   onClick={() => onRetryRow(item.id)}
-                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-error hover:bg-rose-500 text-white text-xs font-semibold cursor-pointer"
+                                  disabled={item.status === "processing"}
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-error hover:bg-rose-500 text-white text-xs font-semibold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                  <RotateCw className="w-3 h-3" />
-                                  <span>Retry</span>
+                                  <RotateCw className={`w-3 h-3 ${item.status === "processing" ? "animate-spin" : ""}`} />
+                                  <span>{item.status === "processing" ? "Retrying..." : "Retry"}</span>
                                 </button>
                               </div>
                             </div>
@@ -448,18 +450,9 @@ export default function ReviewTable({
                         )}
                       </td>
 
-                      {/* Column 8: Actions (Retry / Delete) */}
+                      {/* Column 8: Actions (Delete) */}
                       <td className="py-3.5 px-3 text-center align-middle">
                         <div className="inline-flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                          {isDone && (
-                            <button
-                              onClick={() => onRetryRow(item.id)}
-                              className="p-1 rounded text-champagne-muted hover:text-brass hover:bg-elevated transition-colors cursor-pointer"
-                              title="Re-run extraction on this card"
-                            >
-                              <RotateCw className="w-3.5 h-3.5" />
-                            </button>
-                          )}
                           <button
                             onClick={() => onDeleteRow(item.id)}
                             className="p-1 rounded text-champagne-muted hover:text-error hover:bg-elevated transition-colors cursor-pointer"

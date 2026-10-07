@@ -166,6 +166,9 @@ export async function extractFromImageId(
   });
 
   if (!extractRes.ok) {
+    if (extractRes.status === 503) {
+      throw new Error("Extraction service is not configured on the server.");
+    }
     let errorDetail = `HTTP ${extractRes.status} ${extractRes.statusText}`;
     try {
       const errJson = await extractRes.json();

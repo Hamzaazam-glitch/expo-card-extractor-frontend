@@ -19,6 +19,36 @@ import {
   uploadCardImage,
 } from "@/services/extractorService";
 
+function restoreBackendRecordToItem(existing: CardItem, record: BackendRecord): CardItem {
+  const previewUrl =
+    existing.previewUrl && existing.previewUrl.startsWith("blob:")
+      ? existing.previewUrl
+      : record.storage_url || "";
+
+  return {
+    ...existing,
+    imageId: record.image_id,
+    fileName: existing.fileName || (record.image_id ? record.image_id.slice(0, 8) : "restored"),
+    previewUrl,
+    storageUrl: record.storage_url,
+    status: "done",
+    isReviewed: Boolean(record.reviewed),
+    sourceType: record.source_type || existing.sourceType || "card",
+    saveStatus: existing.saveStatus === "failed" ? "failed" : "idle",
+    saveError: existing.saveError,
+    errorMessage: undefined,
+    data: {
+      image_id: record.image_id,
+      company_name: record.company_name,
+      email: record.email,
+      phone: record.phone,
+      website: record.website,
+      confidence: record.confidence,
+      source_type: record.source_type,
+    },
+  };
+}
+
 function mergeBackendRecords(prevItems: CardItem[], records: BackendRecord[]): CardItem[] {
   // Map current items by image_id (support both item.imageId set during upload and item.data.image_id)
   const existingByImageId = new Map<string, CardItem>();
@@ -47,32 +77,24 @@ function mergeBackendRecords(prevItems: CardItem[], records: BackendRecord[]): C
       return existing;
     }
 
-    // If row exists in current session, preserve its local blob previewUrl
-    const previewUrl =
-      existing?.previewUrl && existing.previewUrl.startsWith("blob:")
-        ? existing.previewUrl
-        : record.storage_url || "";
+    if (existing) {
+      return restoreBackendRecordToItem(existing, record);
+    }
 
     return {
-      id: existing ? existing.id : generateUUID(),
+      id: generateUUID(),
       imageId: record.image_id,
-      fileName: existing
-        ? existing.fileName
-        : record.image_id
-        ? record.image_id.slice(0, 8)
-        : "restored",
-      fileSize: existing ? existing.fileSize : 0,
-      fileType: existing ? existing.fileType : "image/jpeg",
-      previewUrl,
+      fileName: record.image_id ? record.image_id.slice(0, 8) : "restored",
+      fileSize: 0,
+      fileType: "image/jpeg",
+      previewUrl: record.storage_url || "",
       storageUrl: record.storage_url,
-      file: existing?.file,
-      isRestored: !existing,
+      isRestored: true,
       status: "done",
       isReviewed: Boolean(record.reviewed),
       sourceType: record.source_type || "card",
-      saveStatus: existing?.saveStatus === "failed" ? "failed" : "idle",
-      saveError: existing?.saveError,
-      createdAt: existing ? existing.createdAt : Date.now(),
+      saveStatus: "idle",
+      createdAt: Date.now(),
       data: {
         image_id: record.image_id,
         company_name: record.company_name,
@@ -129,6 +151,7 @@ function ExpoCardExtractorApp() {
       }
     >
   >(new Map());
+  const processingIdsRef = React.useRef<Set<string>>(new Set());
 
   const [isExtractingAll, setIsExtractingAll] = useState(false);
   const [isRetryingFailed, setIsRetryingFailed] = useState(false);
@@ -228,92 +251,187 @@ function ExpoCardExtractorApp() {
     });
   }, [showToast]);
 
-  // Process a single card (called sequentially or with concurrency)
-  const processCard = useCallback(async (itemId: string) => {
-    // Set status to processing
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === itemId
-          ? { ...item, status: "processing", errorMessage: undefined }
-          : item
-      )
-    );
+  // Process a single card (called sequentially or on retry)
+  const processCard = useCallback(
+    async (itemId: string, isRetry = false) => {
+      // A2: Per-item in-flight guard: no second /extract or /upload for an item already queued/processing
+      if (processingIdsRef.current.has(itemId)) {
+        return;
+      }
 
-    try {
-      // Find item from itemsRef to avoid stale closures
-      const currentItem = itemsRef.current.find((i) => i.id === itemId);
-      if (!currentItem) return;
+      const itemBefore = itemsRef.current.find((i) => i.id === itemId);
+      if (!itemBefore) return;
+      if (!isRetry && itemBefore.status === "processing") return;
+      if (isRetry && (itemBefore.status === "processing" || itemBefore.status === "queued")) return;
 
-      const selectedSourceType = currentItem.sourceType || "card";
-      let imageId = currentItem.imageId || currentItem.data?.image_id;
+      processingIdsRef.current.add(itemId);
 
-      if (!imageId) {
-        // Step 1: Upload image file
-        const input = currentItem.file || {
-          name: currentItem.fileName,
-          previewUrl: currentItem.previewUrl,
-        };
-        imageId = await uploadCardImage(input);
+      try {
+        const currentItem = itemsRef.current.find((i) => i.id === itemId);
+        if (!currentItem) return;
 
-        // F2 amendment: set imageId on the item immediately after /upload resolves
+        let imageId = currentItem.imageId || currentItem.data?.image_id;
+
+        if (isRetry) {
+          // A3: if item has imageId, call GET /records first
+          if (imageId) {
+            let records: BackendRecord[];
+            try {
+              records = await getRecords();
+            } catch {
+              // A3: if GET /records itself fails, do NOT call /extract. Keep the row failed with a clear message
+              setItems((prev) =>
+                prev.map((item) =>
+                  item.id === itemId
+                    ? {
+                        ...item,
+                        status: "failed",
+                        errorMessage: "Could not check the server; try again",
+                      }
+                    : item
+                )
+              );
+              showToast({
+                type: "error",
+                title: "Server Check Failed",
+                description: "Could not check the server; try again.",
+              });
+              return;
+            }
+
+            const existingRecord = records.find((r) => r.image_id === imageId);
+            if (existingRecord) {
+              // Restore found record into the row (status Done) and do NOT call /extract
+              setItems((prev) =>
+                prev.map((item) =>
+                  item.id === itemId
+                    ? restoreBackendRecordToItem(item, existingRecord)
+                    : item
+                )
+              );
+              showToast({
+                type: "success",
+                title: "Record Restored",
+                description: "Card data was recovered from the server.",
+              });
+              return;
+            }
+
+            // A1: Retry and "Retry N Failed" call POST /extract only for items that have imageId AND no extracted data AND were never edited or reviewed. Never otherwise.
+            if (currentItem.data !== null || currentItem.isEdited || currentItem.isReviewed) {
+              showToast({
+                type: "warning",
+                title: "Extraction Blocked",
+                description: "Cannot re-extract: item already has extracted data, user edits, or is marked reviewed.",
+              });
+              return;
+            }
+          } else {
+            // A3: if the item has NO imageId, skip GET /records and do the normal upload + extract
+            if (currentItem.isEdited || currentItem.isReviewed) {
+              showToast({
+                type: "warning",
+                title: "Extraction Blocked",
+                description: "Cannot re-extract: item was edited or marked reviewed.",
+              });
+              return;
+            }
+          }
+        }
+
+        // Set status to processing
         setItems((prev) =>
           prev.map((item) =>
             item.id === itemId
-              ? { ...item, imageId }
+              ? { ...item, status: "processing", errorMessage: undefined }
               : item
           )
         );
+
+        const selectedSourceType = currentItem.sourceType || "card";
+
+        if (!imageId) {
+          // Step 1: Upload image file
+          const input = currentItem.file || {
+            name: currentItem.fileName,
+            previewUrl: currentItem.previewUrl,
+          };
+          imageId = await uploadCardImage(input);
+
+          // F2 amendment: set imageId on the item immediately after /upload resolves
+          setItems((prev) =>
+            prev.map((item) =>
+              item.id === itemId
+                ? { ...item, imageId }
+                : item
+            )
+          );
+        }
+
+        // Fresh check before POST /extract: must have imageId AND no extracted data AND never edited or reviewed
+        const freshItem = itemsRef.current.find((i) => i.id === itemId);
+        if (freshItem && (freshItem.data !== null || freshItem.isEdited || freshItem.isReviewed)) {
+          return;
+        }
+
+        // Step 2: Extract data using imageId (only calls POST /extract)
+        const res = await extractFromImageId(imageId, selectedSourceType);
+
+        // Set status to done with data and preserve imageId
+        setItems((prev) =>
+          prev.map((item) =>
+            item.id === itemId
+              ? {
+                  ...item,
+                  imageId: res.image_id || imageId,
+                  status: "done",
+                  data: res,
+                  sourceType: res.source_type || selectedSourceType,
+                  saveStatus: "idle",
+                  errorMessage: undefined,
+                }
+              : item
+          )
+        );
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "OCR Processing failed";
+        // If /upload succeeded but /extract failed, imageId is already retained on the item
+        setItems((prev) =>
+          prev.map((item) =>
+            item.id === itemId
+              ? {
+                  ...item,
+                  status: "failed",
+                  errorMessage: msg,
+                }
+              : item
+          )
+        );
+      } finally {
+        // A2: remove the id from processingIdsRef in a finally block (success, failure, abort)
+        processingIdsRef.current.delete(itemId);
       }
+    },
+    [showToast]
+  );
 
-      // Step 2: Extract data using imageId (only calls POST /extract)
-      const res = await extractFromImageId(imageId, selectedSourceType);
-
-      // Set status to done with data and preserve imageId
-      setItems((prev) =>
-        prev.map((item) =>
-          item.id === itemId
-            ? {
-                ...item,
-                imageId: res.image_id || imageId,
-                status: "done",
-                data: res,
-                sourceType: res.source_type || selectedSourceType,
-                saveStatus: "idle",
-                errorMessage: undefined,
-              }
-            : item
-        )
-      );
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "OCR Processing failed";
-      // If /upload succeeded but /extract failed, imageId is already retained on the item
-      setItems((prev) =>
-        prev.map((item) =>
-          item.id === itemId
-            ? {
-                ...item,
-                status: "failed",
-                errorMessage: msg,
-              }
-            : item
-        )
-      );
-    }
-  }, []);
-
-  // Extract All pending items (non-blocking)
+  // Extract All pending items (non-blocking, concurrency 1)
   const handleExtractAll = useCallback(async () => {
     const queuedItems = itemsRef.current.filter((i) => i.status === "queued");
     if (queuedItems.length === 0) return;
 
     setIsExtractingAll(true);
 
-    // Process queued cards sequentially so local OCR CPU load remains smooth
-    for (const item of queuedItems) {
-      await processCard(item.id);
+    try {
+      // Process queued cards sequentially so local OCR CPU load remains smooth
+      for (const item of queuedItems) {
+        if (processingIdsRef.current.has(item.id)) continue;
+        await processCard(item.id, false);
+      }
+    } finally {
+      setIsExtractingAll(false);
     }
 
-    setIsExtractingAll(false);
     showToast({
       type: "success",
       title: "Batch Extraction Complete",
@@ -324,22 +442,18 @@ function ExpoCardExtractorApp() {
   // Retry a single card
   const handleRetryRow = useCallback(
     async (id: string) => {
+      if (processingIdsRef.current.has(id)) return;
       showToast({
         type: "info",
         title: "Retrying Extraction",
-        description: "Re-submitting image to OCR pipeline...",
+        description: "Checking server status and preparing retry...",
       });
-      await processCard(id);
-      showToast({
-        type: "success",
-        title: "Retry Succeeded",
-        description: "Card successfully re-extracted.",
-      });
+      await processCard(id, true);
     },
     [processCard, showToast]
   );
 
-  // Retry all failed cards
+  // Retry all failed cards (concurrency 1)
   const handleRetryFailed = useCallback(async () => {
     if (isRetryingFailed) return;
     const failedItems = itemsRef.current.filter((i) => i.status === "failed");
@@ -354,7 +468,8 @@ function ExpoCardExtractorApp() {
       });
 
       for (const item of failedItems) {
-        await processCard(item.id);
+        if (processingIdsRef.current.has(item.id)) continue;
+        await processCard(item.id, true);
       }
     } finally {
       setIsRetryingFailed(false);
@@ -471,12 +586,13 @@ function ExpoCardExtractorApp() {
         website: field === "website" ? newConfidenceForField : (currentConf.website ?? 0.0),
       };
 
-      // 1. Optimistic UI update: keep edit visible, set saving status
+      // 1. Optimistic UI update: keep edit visible, set saving status, track isEdited
       setItems((prev) =>
         prev.map((item) => {
           if (item.id !== id || !item.data) return item;
           return {
             ...item,
+            isEdited: true,
             saveStatus: "saving",
             saveError: undefined,
             data: {
