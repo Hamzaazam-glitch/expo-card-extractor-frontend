@@ -371,6 +371,19 @@ function ExpoCardExtractorApp() {
         // Fresh check before POST /extract: must have imageId AND no extracted data AND never edited or reviewed
         const freshItem = itemsRef.current.find((i) => i.id === itemId);
         if (freshItem && (freshItem.data !== null || freshItem.isEdited || freshItem.isReviewed)) {
+          setItems((prev) =>
+            prev.map((item) =>
+              item.id === itemId
+                ? {
+                    ...item,
+                    status: item.data ? "done" : "failed",
+                    errorMessage: item.data
+                      ? undefined
+                      : "Extraction blocked: item was edited or reviewed before extraction.",
+                  }
+                : item
+            )
+          );
           return;
         }
 
