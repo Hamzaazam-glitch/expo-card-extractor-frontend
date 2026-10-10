@@ -29,6 +29,7 @@ interface ReviewTableProps {
   onRetryRow: (id: string) => void;
   onDeleteRow: (id: string) => void;
   onRetrySave?: (id: string) => void;
+  lockedRowId?: string | null;
 }
 
 export default function ReviewTable({
@@ -39,6 +40,7 @@ export default function ReviewTable({
   onRetryRow,
   onDeleteRow,
   onRetrySave,
+  lockedRowId,
 }: ReviewTableProps) {
   // Editing state: { id: string, field: string } | null
   const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
@@ -253,11 +255,17 @@ export default function ReviewTable({
                               </div>
                               <button
                                 onClick={() => onRetryRow(item.id)}
-                                disabled={item.status === "processing"}
+                                disabled={item.status === "processing" || lockedRowId === item.id}
                                 className="self-start sm:self-auto inline-flex items-center gap-1 px-2.5 py-1 rounded bg-warning hover:bg-amber-400 text-slate-950 font-bold text-xs transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 <RotateCw className={`w-3 h-3 ${item.status === "processing" ? "animate-spin" : ""}`} />
-                                <span>{item.status === "processing" ? "Retrying..." : "Retry OCR"}</span>
+                                <span>
+                                  {lockedRowId === item.id
+                                    ? "Another extraction is running"
+                                    : item.status === "processing"
+                                    ? "Retrying..."
+                                    : "Retry OCR"}
+                                </span>
                               </button>
                             </div>
                           </td>
@@ -358,11 +366,17 @@ export default function ReviewTable({
                                 </select>
                                 <button
                                   onClick={() => onRetryRow(item.id)}
-                                  disabled={item.status === "processing"}
+                                  disabled={item.status === "processing" || lockedRowId === item.id}
                                   className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-error hover:bg-rose-500 text-white text-xs font-semibold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                   <RotateCw className={`w-3 h-3 ${item.status === "processing" ? "animate-spin" : ""}`} />
-                                  <span>{item.status === "processing" ? "Retrying..." : "Retry"}</span>
+                                  <span>
+                                    {lockedRowId === item.id
+                                      ? "Another extraction is running"
+                                      : item.status === "processing"
+                                      ? "Retrying..."
+                                      : "Retry"}
+                                  </span>
                                 </button>
                               </div>
                             </div>

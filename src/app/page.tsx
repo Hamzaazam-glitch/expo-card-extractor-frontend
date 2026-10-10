@@ -14,8 +14,10 @@ import {
   extractFromImageId,
   generateUUID,
   getRecords,
+  normalizeConfidence,
   patchRecord,
   PatchRecordFields,
+  RecordConflictError,
   uploadCardImage,
 } from "@/services/extractorService";
 
@@ -25,6 +27,8 @@ function restoreBackendRecordToItem(existing: CardItem, record: BackendRecord): 
       ? existing.previewUrl
       : record.storage_url || "";
 
+  const confidence = normalizeConfidence(record.confidence);
+
   return {
     ...existing,
     imageId: record.image_id,
@@ -33,6 +37,7 @@ function restoreBackendRecordToItem(existing: CardItem, record: BackendRecord): 
     storageUrl: record.storage_url,
     status: "done",
     isReviewed: Boolean(record.reviewed),
+    isEdited: false,
     sourceType: record.source_type || existing.sourceType || "card",
     saveStatus: existing.saveStatus === "failed" ? "failed" : "idle",
     saveError: existing.saveError,
@@ -43,7 +48,7 @@ function restoreBackendRecordToItem(existing: CardItem, record: BackendRecord): 
       email: record.email,
       phone: record.phone,
       website: record.website,
-      confidence: record.confidence,
+      confidence,
       source_type: record.source_type,
     },
   };
@@ -152,11 +157,24 @@ function ExpoCardExtractorApp() {
     >
   >(new Map());
   const processingIdsRef = React.useRef<Set<string>>(new Set());
+  const extractLockRef = React.useRef<boolean>(false);
+
+  const [isExtractLocked, setIsExtractLocked] = useState(false);
+  const [lockedRowId, setLockedRowId] = useState<string | null>(null);
+  const lockedRowTimerRef = React.useRef<NodeJS.Timeout | null>(null);
 
   const [isExtractingAll, setIsExtractingAll] = useState(false);
   const [isRetryingFailed, setIsRetryingFailed] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { showToast } = useToast();
+
+  React.useEffect(() => {
+    return () => {
+      if (lockedRowTimerRef.current) {
+        clearTimeout(lockedRowTimerRef.current);
+      }
+    };
+  }, []);
 
   // Initial fetch on mount with image_id deduplication
   React.useEffect(() => {
@@ -266,11 +284,13 @@ function ExpoCardExtractorApp() {
 
       processingIdsRef.current.add(itemId);
 
+      let imageId: string | undefined = itemBefore.imageId || itemBefore.data?.image_id;
+
       try {
         const currentItem = itemsRef.current.find((i) => i.id === itemId);
         if (!currentItem) return;
 
-        let imageId = currentItem.imageId || currentItem.data?.image_id;
+        imageId = currentItem.imageId || currentItem.data?.image_id || imageId;
 
         if (isRetry) {
           // A3: if item has imageId, call GET /records first
@@ -407,6 +427,79 @@ function ExpoCardExtractorApp() {
           )
         );
       } catch (err: unknown) {
+        if (err instanceof RecordConflictError) {
+          // B1 & B2 & B4: 409 Conflict Handling
+          let recordToRestore = err.record;
+
+          // B4: fallback if record is missing or malformed (e.g. missing image_id)
+          if (!recordToRestore || !recordToRestore.image_id) {
+            try {
+              const allRecords = await getRecords();
+              const matched = allRecords.find((r) => r.image_id === imageId);
+              if (matched) {
+                recordToRestore = matched;
+              }
+            } catch {
+              // GET /records fallback failed
+            }
+          }
+
+          if (recordToRestore && recordToRestore.image_id) {
+            const currentLatest = itemsRef.current.find((i) => i.id === itemId);
+            // B2: If row has data === null, ALWAYS restore from 409 record, even if isEdited/isReviewed flags are set.
+            // Keep local state only when local data exists. A 409 must never set isEdited.
+            if (currentLatest?.data !== null && currentLatest?.data !== undefined) {
+              // Local data exists: preserve local state (data, isEdited, isReviewed), just mark status done
+              setItems((prev) =>
+                prev.map((item) =>
+                  item.id === itemId
+                    ? {
+                        ...item,
+                        status: "done",
+                        errorMessage: undefined,
+                      }
+                    : item
+                )
+              );
+            } else {
+              // data === null: ALWAYS restore from record
+              setItems((prev) =>
+                prev.map((item) =>
+                  item.id === itemId
+                    ? restoreBackendRecordToItem(item, recordToRestore!)
+                    : item
+                )
+              );
+            }
+
+            showToast({
+              type: "info",
+              title: "Record Already Exists",
+              description: "Existing card data was recovered from the server.",
+            });
+            return;
+          }
+
+          // B4: Fallback could not find or restore record
+          setItems((prev) =>
+            prev.map((item) =>
+              item.id === itemId
+                ? {
+                    ...item,
+                    status: "failed",
+                    errorMessage: "Record conflict on server, but existing record could not be retrieved.",
+                  }
+                : item
+            )
+          );
+          showToast({
+            type: "error",
+            title: "Recovery Failed",
+            description: "Server has an existing record for this image, but it could not be retrieved.",
+          });
+          return;
+        }
+
         const msg = err instanceof Error ? err.message : "OCR Processing failed";
         // If /upload succeeded but /extract failed, imageId is already retained on the item
         setItems((prev) =>
@@ -421,7 +514,7 @@ function ExpoCardExtractorApp() {
           )
         );
       } finally {
-        // A2: remove the id from processingIdsRef in a finally block (success, failure, abort)
+        // A2 & B3: remove the id from processingIdsRef in a finally block (success, failure, abort)
         processingIdsRef.current.delete(itemId);
       }
     },
@@ -430,9 +523,19 @@ function ExpoCardExtractorApp() {
 
   // Extract All pending items (non-blocking, concurrency 1)
   const handleExtractAll = useCallback(async () => {
+    if (isExtractingAll || extractLockRef.current) {
+      showToast({
+        type: "info",
+        title: "Extraction in Progress",
+        description: "Another extraction is running. Please wait for it to finish.",
+      });
+      return;
+    }
     const queuedItems = itemsRef.current.filter((i) => i.status === "queued");
     if (queuedItems.length === 0) return;
 
+    extractLockRef.current = true;
+    setIsExtractLocked(true);
     setIsExtractingAll(true);
 
     try {
@@ -443,6 +546,8 @@ function ExpoCardExtractorApp() {
       }
     } finally {
       setIsExtractingAll(false);
+      extractLockRef.current = false;
+      setIsExtractLocked(false);
     }
 
     showToast({
@@ -450,28 +555,60 @@ function ExpoCardExtractorApp() {
       title: "Batch Extraction Complete",
       description: "Finished processing card queue. Review any flagged rows below.",
     });
-  }, [processCard, showToast]);
+  }, [isExtractingAll, processCard, showToast]);
 
   // Retry a single card
   const handleRetryRow = useCallback(
     async (id: string) => {
       if (processingIdsRef.current.has(id)) return;
-      showToast({
-        type: "info",
-        title: "Retrying Extraction",
-        description: "Checking server status and preparing retry...",
-      });
-      await processCard(id, true);
+      if (extractLockRef.current) {
+        setLockedRowId(id);
+        if (lockedRowTimerRef.current) {
+          clearTimeout(lockedRowTimerRef.current);
+        }
+        lockedRowTimerRef.current = setTimeout(() => {
+          setLockedRowId(null);
+        }, 2500);
+        showToast({
+          type: "info",
+          title: "Extraction in Progress",
+          description: "Another extraction is running. Please wait for it to finish.",
+        });
+        return;
+      }
+
+      extractLockRef.current = true;
+      setIsExtractLocked(true);
+      try {
+        showToast({
+          type: "info",
+          title: "Retrying Extraction",
+          description: "Checking server status and preparing retry...",
+        });
+        await processCard(id, true);
+      } finally {
+        extractLockRef.current = false;
+        setIsExtractLocked(false);
+      }
     },
     [processCard, showToast]
   );
 
   // Retry all failed cards (concurrency 1)
   const handleRetryFailed = useCallback(async () => {
-    if (isRetryingFailed) return;
+    if (isRetryingFailed || extractLockRef.current) {
+      showToast({
+        type: "info",
+        title: "Extraction in Progress",
+        description: "Another extraction is running. Please wait for it to finish.",
+      });
+      return;
+    }
     const failedItems = itemsRef.current.filter((i) => i.status === "failed");
     if (failedItems.length === 0) return;
 
+    extractLockRef.current = true;
+    setIsExtractLocked(true);
     setIsRetryingFailed(true);
     try {
       showToast({
@@ -486,6 +623,8 @@ function ExpoCardExtractorApp() {
       }
     } finally {
       setIsRetryingFailed(false);
+      extractLockRef.current = false;
+      setIsExtractLocked(false);
     }
   }, [isRetryingFailed, processCard, showToast]);
 
@@ -800,7 +939,7 @@ function ExpoCardExtractorApp() {
             onRemoveItem={handleRemoveItem}
             onExtractAll={handleExtractAll}
             onUpdateSourceType={handleUpdateQueuedSourceType}
-            isExtracting={isExtractingAll}
+            isExtracting={isExtractingAll || isExtractLocked}
           />
         </motion.section>
 
@@ -816,7 +955,7 @@ function ExpoCardExtractorApp() {
               <ProcessingTracker
                 items={items}
                 onRetryFailed={handleRetryFailed}
-                isRetrying={isRetryingFailed}
+                isRetrying={isRetryingFailed || isExtractLocked}
               />
             </motion.section>
           )}
@@ -844,6 +983,7 @@ function ExpoCardExtractorApp() {
                 onRetryRow={handleRetryRow}
                 onDeleteRow={handleDeleteRow}
                 onRetrySave={handleRetrySave}
+                lockedRowId={lockedRowId}
               />
             </motion.section>
           )}

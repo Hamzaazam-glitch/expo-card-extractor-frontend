@@ -143,6 +143,26 @@ export async function uploadCardImage(
   return imageId;
 }
 
+export class RecordConflictError extends Error {
+  record?: BackendRecord;
+
+  constructor(message: string, record?: BackendRecord) {
+    super(message);
+    this.name = "RecordConflictError";
+    this.record = record;
+  }
+}
+
+export function normalizeConfidence(rawConfidence: unknown): FieldConfidence {
+  const raw = (rawConfidence && typeof rawConfidence === "object" ? rawConfidence : {}) as Record<string, unknown>;
+  return {
+    company_name: typeof raw.company_name === "number" ? raw.company_name : 0.0,
+    email: typeof raw.email === "number" ? raw.email : 0.0,
+    phone: typeof raw.phone === "number" ? raw.phone : 0.0,
+    website: typeof raw.website === "number" ? raw.website : 0.0,
+  };
+}
+
 /**
  * Triggers OCR extraction on an already uploaded image by image_id (POST /extract).
  */
@@ -166,6 +186,36 @@ export async function extractFromImageId(
   });
 
   if (!extractRes.ok) {
+    if (extractRes.status === 409) {
+      let errorDetail = "Record already exists for this image.";
+      let parsedRecord: BackendRecord | undefined = undefined;
+      try {
+        const errJson = await extractRes.json();
+        if (errJson.detail) {
+          errorDetail = typeof errJson.detail === "string" ? errJson.detail : JSON.stringify(errJson.detail);
+        }
+        if (errJson.record && typeof errJson.record === "object") {
+          const rec = errJson.record as Record<string, unknown>;
+          parsedRecord = {
+            id: typeof rec.id === "string" ? rec.id : (typeof rec.image_id === "string" ? rec.image_id : undefined),
+            image_id: typeof rec.image_id === "string" ? rec.image_id : imageId,
+            company_name: typeof rec.company_name === "string" ? rec.company_name : null,
+            email: typeof rec.email === "string" ? rec.email : null,
+            phone: typeof rec.phone === "string" ? rec.phone : null,
+            website: typeof rec.website === "string" ? rec.website : null,
+            confidence: normalizeConfidence(rec.confidence),
+            source_type: (["card", "paper", "panaflex"].includes(String(rec.source_type || "").toLowerCase())
+              ? String(rec.source_type).toLowerCase()
+              : requestedSourceType) as SourceType,
+            reviewed: Boolean(rec.reviewed),
+            storage_url: typeof rec.storage_url === "string" ? rec.storage_url : null,
+          };
+        }
+      } catch {
+        // fallback to default errorDetail and undefined record
+      }
+      throw new RecordConflictError(errorDetail, parsedRecord);
+    }
     if (extractRes.status === 503) {
       throw new Error("Extraction service is not configured on the server.");
     }
@@ -183,25 +233,7 @@ export async function extractFromImageId(
 
   const extractData = await extractRes.json();
 
-  const rawConfidence = extractData?.confidence || {};
-  const confidence: FieldConfidence = {
-    company_name:
-      typeof rawConfidence.company_name === "number"
-        ? rawConfidence.company_name
-        : 0.0,
-    email:
-      typeof rawConfidence.email === "number"
-        ? rawConfidence.email
-        : 0.0,
-    phone:
-      typeof rawConfidence.phone === "number"
-        ? rawConfidence.phone
-        : 0.0,
-    website:
-      typeof rawConfidence.website === "number"
-        ? rawConfidence.website
-        : 0.0,
-  };
+  const confidence: FieldConfidence = normalizeConfidence(extractData?.confidence);
 
   const validSourceTypes: SourceType[] = ["card", "paper", "panaflex"];
   const rawSourceType = String(extractData?.source_type || requestedSourceType || "card").toLowerCase();
@@ -265,12 +297,16 @@ export async function patchRecord(
   id: string,
   fields: PatchRecordFields
 ): Promise<void> {
+  const payload: PatchRecordFields = { ...fields };
+  if (payload.confidence) {
+    payload.confidence = normalizeConfidence(payload.confidence);
+  }
   const res = await fetchWithTimeout(`${API_BASE_URL}/records/${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(fields),
+    body: JSON.stringify(payload),
     timeoutMs: TIMEOUT_DEFAULT_MS,
     timeoutMessage: "Save request timed out after 30s. Please retry saving your edits.",
     endpointName: `PATCH /records/${id}`,
@@ -322,13 +358,7 @@ export async function getRecords(options?: { reviewed?: boolean }): Promise<Back
   }
 
   return raw.map((item: Record<string, unknown>): BackendRecord => {
-    const rawConf = (item.confidence && typeof item.confidence === "object" ? item.confidence : {}) as Record<string, unknown>;
-    const confidence: FieldConfidence = {
-      company_name: typeof rawConf.company_name === "number" ? rawConf.company_name : 0.0,
-      email: typeof rawConf.email === "number" ? rawConf.email : 0.0,
-      phone: typeof rawConf.phone === "number" ? rawConf.phone : 0.0,
-      website: typeof rawConf.website === "number" ? rawConf.website : 0.0,
-    };
+    const confidence = normalizeConfidence(item.confidence);
 
     const validSourceTypes: SourceType[] = ["card", "paper", "panaflex"];
     const rawSourceType = String(item.source_type || "card").toLowerCase();
